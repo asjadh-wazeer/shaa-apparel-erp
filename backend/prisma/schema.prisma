@@ -1,0 +1,1543 @@
+// =============================================================
+// SHAA Apparel ERP — Prisma Schema
+// Database: MySQL 8.0
+// =============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================
+// ENUMS
+// =============================================================
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  TRIAL
+  CANCELLED
+}
+
+enum SubscriptionPlanTier {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  TRIAL
+  PAST_DUE
+}
+
+enum BillingInterval {
+  MONTHLY
+  ANNUALLY
+}
+
+enum StockMovementType {
+  PURCHASE_RECEIVED
+  PRODUCTION_ISSUED
+  PRODUCTION_RETURNED
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  TRANSFER_IN
+  TRANSFER_OUT
+  WASTAGE
+  SALE
+  OPENING_BALANCE
+}
+
+enum StockMovementStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum InventoryItemType {
+  FABRIC
+  ACCESSORY
+  PACKAGING
+  SPARE_PART
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  PARTIALLY_RECEIVED
+  FULLY_RECEIVED
+  CANCELLED
+}
+
+enum GrnStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
+enum ProductionOrderStatus {
+  DRAFT
+  PLANNED
+  IN_PROGRESS
+  PARTIALLY_COMPLETED
+  COMPLETED
+  ON_HOLD
+  CANCELLED
+}
+
+enum ProductionBatchStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ProductionStageStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+  BLOCKED
+}
+
+enum QualityCheckResult {
+  PASSED
+  FAILED
+  CONDITIONAL_PASS
+}
+
+enum DefectSeverity {
+  MINOR
+  MAJOR
+  CRITICAL
+}
+
+enum ReworkStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+}
+
+enum SyncStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  RETRY
+}
+
+enum SaleChannel {
+  POS
+  ONLINE
+  WHOLESALE
+  DIRECT
+}
+
+enum SaleStatus {
+  COMPLETED
+  INVOICED
+  REFUNDED
+  CANCELLED
+}
+
+enum NotificationType {
+  LOW_STOCK
+  PRODUCTION_DELAY
+  QUALITY_FAILURE
+  ORDER_STATUS_CHANGE
+  SYSTEM_ALERT
+  BILLING_ALERT
+  GENERAL
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  WEBHOOK
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  EXPORT
+  IMPORT
+  APPROVE
+  REJECT
+}
+
+enum FileEntityType {
+  PURCHASE_ORDER
+  GRN
+  PRODUCTION_ORDER
+  QUALITY_CHECK
+  SUPPLIER
+  USER_AVATAR
+  TENANT_LOGO
+  COSTING_DOCUMENT
+}
+
+// =============================================================
+// CORE — Tenants, Users, Roles, Permissions
+// =============================================================
+
+model Tenant {
+  id          String       @id @default(cuid())
+  name        String       @db.VarChar(255)
+  slug        String       @unique @db.VarChar(100)
+  status      TenantStatus @default(TRIAL)
+  logoUrl     String?      @db.VarChar(500)
+  address     String?      @db.Text
+  phone       String?      @db.VarChar(50)
+  email       String?      @db.VarChar(255)
+  country     String?      @db.VarChar(100)
+  timezone    String       @default("UTC") @db.VarChar(50)
+  currency    String       @default("USD") @db.VarChar(10)
+  deletedAt   DateTime?
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  users               User[]
+  roles               Role[]
+  factories           Factory[]
+  warehouses          Warehouse[]
+  inventoryItems      InventoryItem[]
+  suppliers           Supplier[]
+  purchaseOrders      PurchaseOrder[]
+  productionOrders    ProductionOrder[]
+  productionStageConfigs ProductionStageConfig[]
+  costingConfigs      CostingConfig[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  activityLogs        ActivityLog[]
+  tenantSubscription  TenantSubscription?
+  tenantFeatures      TenantFeature[]
+  systemSettings      SystemSetting[]
+  posConfig           PosConfig?
+  employees           Employee[]
+  attendanceRecords   Attendance[]
+  kpiRecords          KpiRecord[]
+  saleRecords         SaleRecord[]
+
+  @@index([slug])
+  @@index([status])
+  @@map("tenants")
+}
+
+model User {
+  id               String     @id @default(cuid())
+  tenantId         String
+  email            String     @db.VarChar(255)
+  username         String     @db.VarChar(100)
+  passwordHash     String     @db.VarChar(255)
+  firstName        String     @db.VarChar(100)
+  lastName         String     @db.VarChar(100)
+  phone            String?    @db.VarChar(50)
+  avatarUrl        String?    @db.VarChar(500)
+  status           UserStatus @default(ACTIVE)
+  lastLoginAt      DateTime?
+  emailVerifiedAt  DateTime?
+  deletedAt        DateTime?
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  userRoles      UserRole[]
+  refreshTokens  RefreshToken[]
+  loginSessions  LoginSession[]
+  auditLogs      AuditLog[]      @relation("AuditUser")
+  activityLogs   ActivityLog[]
+  notifications  Notification[]
+  assignments    ProductionAssignment[]
+
+  @@unique([tenantId, email])
+  @@unique([tenantId, username])
+  @@index([tenantId])
+  @@index([email])
+  @@map("users")
+}
+
+model RefreshToken {
+  id          String   @id @default(cuid())
+  userId      String
+  token       String   @unique @db.VarChar(500)
+  deviceInfo  String?  @db.VarChar(500)
+  ipAddress   String?  @db.VarChar(50)
+  expiresAt   DateTime
+  revokedAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+model LoginSession {
+  id          String    @id @default(cuid())
+  userId      String
+  ipAddress   String?   @db.VarChar(50)
+  userAgent   String?   @db.VarChar(500)
+  deviceInfo  String?   @db.VarChar(500)
+  loggedInAt  DateTime  @default(now())
+  loggedOutAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("login_sessions")
+}
+
+model Role {
+  id          String  @id @default(cuid())
+  tenantId    String
+  name        String  @db.VarChar(100)
+  description String? @db.VarChar(500)
+  isSystem    Boolean @default(false)
+  deletedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("roles")
+}
+
+model Permission {
+  id          String  @id @default(cuid())
+  module      String  @db.VarChar(100)
+  action      String  @db.VarChar(100)
+  description String? @db.VarChar(500)
+
+  createdAt DateTime @default(now())
+
+  rolePermissions RolePermission[]
+
+  @@unique([module, action])
+  @@index([module])
+  @@map("permissions")
+}
+
+model UserRole {
+  userId String
+  roleId String
+
+  assignedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  assignedAt DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// =============================================================
+// FACTORIES
+// =============================================================
+
+model Factory {
+  id          String  @id @default(cuid())
+  tenantId    String
+  name        String  @db.VarChar(255)
+  code        String  @db.VarChar(50)
+  address     String? @db.Text
+  phone       String? @db.VarChar(50)
+  isActive    Boolean @default(true)
+  deletedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  productionOrders ProductionOrder[]
+  warehouses       Warehouse[]
+  employees        Employee[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("factories")
+}
+
+// =============================================================
+// INVENTORY
+// =============================================================
+
+model InventoryItem {
+  id              String            @id @default(cuid())
+  tenantId        String
+  code            String            @db.VarChar(100)
+  name            String            @db.VarChar(255)
+  description     String?           @db.Text
+  type            InventoryItemType
+  unit            String            @db.VarChar(50)
+  reorderLevel    Decimal           @default(0) @db.Decimal(12, 3)
+  reorderQuantity Decimal           @default(0) @db.Decimal(12, 3)
+  costPerUnit     Decimal           @default(0) @db.Decimal(15, 4)
+  barcode         String?           @db.VarChar(200)
+  imageUrl        String?           @db.VarChar(500)
+  isActive        Boolean           @default(true)
+  deletedAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant               Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  warehouseStock       WarehouseStock[]
+  stockMovements       StockMovement[]
+  purchaseOrderItems   PurchaseOrderItem[]
+  grnItems             GrnItem[]
+  garmentAccessories   GarmentAccessory[]
+  costingLines         CostingLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([type])
+  @@index([barcode])
+  @@map("inventory_items")
+}
+
+model Warehouse {
+  id          String  @id @default(cuid())
+  tenantId    String
+  factoryId   String?
+  name        String  @db.VarChar(255)
+  code        String  @db.VarChar(50)
+  location    String? @db.VarChar(500)
+  isDefault   Boolean @default(false)
+  isActive    Boolean @default(true)
+  deletedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant         Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  factory        Factory?         @relation(fields: [factoryId], references: [id], onDelete: SetNull)
+  warehouseStock WarehouseStock[]
+  inboundTransfers  StockTransfer[] @relation("DestinationWarehouse")
+  outboundTransfers StockTransfer[] @relation("SourceWarehouse")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("warehouses")
+}
+
+model WarehouseStock {
+  id              String  @id @default(cuid())
+  warehouseId     String
+  inventoryItemId String
+  quantity        Decimal @default(0) @db.Decimal(12, 3)
+  reservedQty     Decimal @default(0) @db.Decimal(12, 3)
+  avgCostPerUnit  Decimal @default(0) @db.Decimal(15, 4)
+
+  updatedAt DateTime @updatedAt
+
+  warehouse     Warehouse     @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+
+  @@unique([warehouseId, inventoryItemId])
+  @@index([warehouseId])
+  @@index([inventoryItemId])
+  @@map("warehouse_stock")
+}
+
+model StockMovement {
+  id              String              @id @default(cuid())
+  tenantId        String
+  inventoryItemId String
+  warehouseId     String?
+  type            StockMovementType
+  status          StockMovementStatus @default(COMPLETED)
+  quantity        Decimal             @db.Decimal(12, 3)
+  unitCost        Decimal?            @db.Decimal(15, 4)
+  totalCost       Decimal?            @db.Decimal(15, 4)
+  referenceType   String?             @db.VarChar(100)
+  referenceId     String?             @db.VarChar(255)
+  notes           String?             @db.Text
+  performedById   String?
+  createdAt       DateTime            @default(now())
+
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([inventoryItemId])
+  @@index([type])
+  @@index([referenceType, referenceId])
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
+model StockTransfer {
+  id                  String   @id @default(cuid())
+  tenantId            String
+  sourceWarehouseId   String
+  destWarehouseId     String
+  referenceNumber     String   @db.VarChar(100)
+  notes               String?  @db.Text
+  transferredById     String?
+  transferredAt       DateTime @default(now())
+
+  sourceWarehouse Warehouse @relation("SourceWarehouse", fields: [sourceWarehouseId], references: [id], onDelete: Restrict)
+  destWarehouse   Warehouse @relation("DestinationWarehouse", fields: [destWarehouseId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([sourceWarehouseId])
+  @@index([destWarehouseId])
+  @@map("stock_transfers")
+}
+
+model InventoryAdjustment {
+  id              String   @id @default(cuid())
+  tenantId        String
+  warehouseId     String
+  inventoryItemId String
+  adjustmentType  String   @db.VarChar(50)
+  quantityBefore  Decimal  @db.Decimal(12, 3)
+  quantityAfter   Decimal  @db.Decimal(12, 3)
+  adjustedQty     Decimal  @db.Decimal(12, 3)
+  reason          String   @db.VarChar(500)
+  adjustedById    String?
+  approvedById    String?
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([warehouseId])
+  @@index([inventoryItemId])
+  @@map("inventory_adjustments")
+}
+
+// =============================================================
+// SUPPLIERS & PURCHASING
+// =============================================================
+
+model Supplier {
+  id          String  @id @default(cuid())
+  tenantId    String
+  code        String  @db.VarChar(100)
+  name        String  @db.VarChar(255)
+  contactName String? @db.VarChar(255)
+  email       String? @db.VarChar(255)
+  phone       String? @db.VarChar(50)
+  address     String? @db.Text
+  country     String? @db.VarChar(100)
+  taxNumber   String? @db.VarChar(100)
+  paymentTerms String? @db.VarChar(100)
+  isActive    Boolean @default(true)
+  deletedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  purchaseOrders PurchaseOrder[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("suppliers")
+}
+
+model PurchaseOrder {
+  id              String              @id @default(cuid())
+  tenantId        String
+  supplierId      String
+  poNumber        String              @db.VarChar(100)
+  status          PurchaseOrderStatus @default(DRAFT)
+  orderDate       DateTime
+  expectedDate    DateTime?
+  receivedDate    DateTime?
+  totalAmount     Decimal             @default(0) @db.Decimal(15, 2)
+  taxAmount       Decimal             @default(0) @db.Decimal(15, 2)
+  discountAmount  Decimal             @default(0) @db.Decimal(15, 2)
+  notes           String?             @db.Text
+  createdById     String?
+  approvedById    String?
+  approvedAt      DateTime?
+  deletedAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  supplier Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  items    PurchaseOrderItem[]
+  grns     GoodsReceivedNote[]
+  files    FileUpload[]
+
+  @@unique([tenantId, poNumber])
+  @@index([tenantId])
+  @@index([supplierId])
+  @@index([status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String  @id @default(cuid())
+  purchaseOrderId String
+  inventoryItemId String
+  orderedQty      Decimal @db.Decimal(12, 3)
+  receivedQty     Decimal @default(0) @db.Decimal(12, 3)
+  unitPrice       Decimal @db.Decimal(15, 4)
+  totalPrice      Decimal @db.Decimal(15, 2)
+  notes           String? @db.VarChar(500)
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+
+  @@index([purchaseOrderId])
+  @@index([inventoryItemId])
+  @@map("purchase_order_items")
+}
+
+model GoodsReceivedNote {
+  id              String    @id @default(cuid())
+  tenantId        String
+  purchaseOrderId String
+  grnNumber       String    @db.VarChar(100)
+  status          GrnStatus @default(DRAFT)
+  receivedDate    DateTime  @default(now())
+  warehouseId     String?
+  notes           String?   @db.Text
+  receivedById    String?
+  confirmedById   String?
+  confirmedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  items         GrnItem[]
+  files         FileUpload[]
+
+  @@unique([tenantId, grnNumber])
+  @@index([tenantId])
+  @@index([purchaseOrderId])
+  @@map("goods_received_notes")
+}
+
+model GrnItem {
+  id              String  @id @default(cuid())
+  grnId           String
+  inventoryItemId String
+  receivedQty     Decimal @db.Decimal(12, 3)
+  acceptedQty     Decimal @db.Decimal(12, 3)
+  rejectedQty     Decimal @default(0) @db.Decimal(12, 3)
+  unitCost        Decimal @db.Decimal(15, 4)
+  notes           String? @db.VarChar(500)
+
+  grn           GoodsReceivedNote @relation(fields: [grnId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem     @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+
+  @@index([grnId])
+  @@index([inventoryItemId])
+  @@map("grn_items")
+}
+
+// =============================================================
+// PRODUCTION
+// =============================================================
+
+model ProductionStageConfig {
+  id          String  @id @default(cuid())
+  tenantId    String
+  name        String  @db.VarChar(255)
+  code        String  @db.VarChar(50)
+  description String? @db.Text
+  orderIndex  Int
+  isActive    Boolean @default(true)
+  isMandatory Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  stageHistories ProductionStageHistory[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("production_stage_configs")
+}
+
+model ProductionOrder {
+  id              String                @id @default(cuid())
+  tenantId        String
+  factoryId       String?
+  orderNumber     String                @db.VarChar(100)
+  description     String?               @db.Text
+  status          ProductionOrderStatus @default(DRAFT)
+  garmentTypeId   String?
+  plannedQty      Int
+  completedQty    Int                   @default(0)
+  rejectedQty     Int                   @default(0)
+  plannedStartDate DateTime?
+  plannedEndDate   DateTime?
+  actualStartDate  DateTime?
+  actualEndDate    DateTime?
+  priority        Int                   @default(5)
+  notes           String?               @db.Text
+  createdById     String?
+  deletedAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  factory      Factory?             @relation(fields: [factoryId], references: [id], onDelete: SetNull)
+  garmentType  GarmentType?         @relation(fields: [garmentTypeId], references: [id], onDelete: SetNull)
+  batches           ProductionBatch[]
+  assignments       ProductionAssignment[]
+  qualityChecks     QualityCheck[]
+  costingCalc       CostingCalculation?
+  files             FileUpload[]
+  designSubmissions DesignSubmission[]
+  patternRecords    PatternRecord[]
+  cuttingOrders     CuttingOrder[]
+
+  @@unique([tenantId, orderNumber])
+  @@index([tenantId])
+  @@index([status])
+  @@index([factoryId])
+  @@map("production_orders")
+}
+
+model ProductionBatch {
+  id               String                @id @default(cuid())
+  productionOrderId String
+  batchNumber      String                @db.VarChar(100)
+  status           ProductionBatchStatus @default(OPEN)
+  plannedQty       Int
+  completedQty     Int                   @default(0)
+  currentStageId   String?
+  notes            String?               @db.Text
+  startedAt        DateTime?
+  completedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  productionOrder ProductionOrder          @relation(fields: [productionOrderId], references: [id], onDelete: Restrict)
+  stageHistories  ProductionStageHistory[]
+  wastageRecords  WastageRecord[]
+
+  @@index([productionOrderId])
+  @@index([status])
+  @@map("production_batches")
+}
+
+model ProductionStageHistory {
+  id              String                @id @default(cuid())
+  batchId         String
+  stageConfigId   String
+  status          ProductionStageStatus @default(PENDING)
+  plannedQty      Int
+  completedQty    Int                   @default(0)
+  rejectedQty     Int                   @default(0)
+  operatorId      String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  targetMinutes   Int?
+  actualMinutes   Int?
+  notes           String?               @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  batch       ProductionBatch       @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  stageConfig ProductionStageConfig @relation(fields: [stageConfigId], references: [id], onDelete: Restrict)
+
+  @@index([batchId])
+  @@index([stageConfigId])
+  @@index([status])
+  @@map("production_stage_histories")
+}
+
+model ProductionAssignment {
+  id               String   @id @default(cuid())
+  productionOrderId String
+  userId           String
+  role             String   @db.VarChar(100)
+  assignedAt       DateTime @default(now())
+  unassignedAt     DateTime?
+
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([productionOrderId])
+  @@index([userId])
+  @@map("production_assignments")
+}
+
+// =============================================================
+// COSTING ENGINE
+// =============================================================
+
+model GarmentType {
+  id          String  @id @default(cuid())
+  tenantId    String?
+  name        String  @db.VarChar(255)
+  code        String  @db.VarChar(50)
+  description String? @db.Text
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  productionOrders   ProductionOrder[]
+  garmentAccessories GarmentAccessory[]
+  costingConfigs     CostingConfig[]
+
+  @@unique([code])
+  @@map("garment_types")
+}
+
+model GarmentAccessory {
+  id              String  @id @default(cuid())
+  garmentTypeId   String
+  inventoryItemId String
+  quantity        Decimal @db.Decimal(10, 4)
+  unit            String  @db.VarChar(50)
+  notes           String? @db.VarChar(500)
+
+  garmentType   GarmentType   @relation(fields: [garmentTypeId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+
+  @@unique([garmentTypeId, inventoryItemId])
+  @@index([garmentTypeId])
+  @@map("garment_accessories")
+}
+
+model CostingConfig {
+  id              String  @id @default(cuid())
+  tenantId        String
+  garmentTypeId   String?
+  name            String  @db.VarChar(255)
+  laborCostPerPcs Decimal @default(0) @db.Decimal(15, 4)
+  overheadPercent Decimal @default(0) @db.Decimal(5, 2)
+  profitMarginPct Decimal @default(0) @db.Decimal(5, 2)
+  wastageMinPct   Decimal @default(0) @db.Decimal(5, 2)
+  wastageMaxPct   Decimal @default(15) @db.Decimal(5, 2)
+  isDefault       Boolean @default(false)
+  isActive        Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  garmentType GarmentType? @relation(fields: [garmentTypeId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@map("costing_configs")
+}
+
+model CostingCalculation {
+  id               String  @id @default(cuid())
+  tenantId         String
+  productionOrderId String  @unique
+  costingConfigId  String?
+  totalFabricCost  Decimal @default(0) @db.Decimal(15, 4)
+  totalAccessoryCost Decimal @default(0) @db.Decimal(15, 4)
+  totalLaborCost   Decimal @default(0) @db.Decimal(15, 4)
+  totalWastageCost Decimal @default(0) @db.Decimal(15, 4)
+  overheadCost     Decimal @default(0) @db.Decimal(15, 4)
+  totalCost        Decimal @default(0) @db.Decimal(15, 4)
+  costPerPiece     Decimal @default(0) @db.Decimal(15, 4)
+  sellingPricePerPcs Decimal @default(0) @db.Decimal(15, 4)
+  profitMarginPct  Decimal @default(0) @db.Decimal(5, 2)
+  calculatedById   String?
+  isApproved       Boolean @default(false)
+  approvedById     String?
+  approvedAt       DateTime?
+  notes            String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Restrict)
+  lines           CostingLine[]
+
+  @@index([tenantId])
+  @@map("costing_calculations")
+}
+
+model CostingLine {
+  id                  String  @id @default(cuid())
+  costingCalculationId String
+  inventoryItemId     String
+  lineType            String  @db.VarChar(50)
+  quantity            Decimal @db.Decimal(12, 3)
+  unitCost            Decimal @db.Decimal(15, 4)
+  wastagePercent      Decimal @default(0) @db.Decimal(5, 2)
+  wastageQty          Decimal @default(0) @db.Decimal(12, 3)
+  totalCost           Decimal @db.Decimal(15, 4)
+  notes               String? @db.VarChar(500)
+
+  costingCalculation CostingCalculation @relation(fields: [costingCalculationId], references: [id], onDelete: Cascade)
+  inventoryItem      InventoryItem      @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+
+  @@index([costingCalculationId])
+  @@map("costing_lines")
+}
+
+model WastageRecord {
+  id              String  @id @default(cuid())
+  tenantId        String
+  batchId         String
+  inventoryItemId String?
+  wastageType     String  @db.VarChar(100)
+  quantity        Decimal @db.Decimal(12, 3)
+  wastagePercent  Decimal @db.Decimal(5, 2)
+  isThresholdExceeded Boolean @default(false)
+  reason          String? @db.Text
+  recordedById    String?
+  recordedAt      DateTime @default(now())
+
+  batch ProductionBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([batchId])
+  @@map("wastage_records")
+}
+
+// =============================================================
+// PHASE 2 — Design, Pattern, Cutting
+// =============================================================
+
+enum DesignStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+enum PatternStatus {
+  PENDING
+  IN_PROGRESS
+  SAMPLE_APPROVED
+  APPROVED
+  REJECTED
+}
+
+enum CuttingStatus {
+  PENDING
+  CUTTING
+  COMPLETED
+  VERIFIED
+}
+
+model DesignSubmission {
+  id                String       @id @default(cuid())
+  tenantId          String
+  productionOrderId String
+  reviewNumber      String       @db.VarChar(100)
+  sizes             String?      @db.VarChar(500)
+  assigneeId        String?
+  status            DesignStatus @default(PENDING_APPROVAL)
+  notes             String?      @db.Text
+  approvedById      String?
+  approvedAt        DateTime?
+  rejectedReason    String?      @db.Text
+  submittedAt       DateTime     @default(now())
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, reviewNumber])
+  @@index([tenantId])
+  @@index([productionOrderId])
+  @@index([status])
+  @@map("design_submissions")
+}
+
+model PatternRecord {
+  id                String        @id @default(cuid())
+  tenantId          String
+  productionOrderId String
+  patternNumber     String        @db.VarChar(100)
+  patternType       String        @default("SAMPLE") @db.VarChar(50)
+  sizeRange         String?       @db.VarChar(100)
+  drawingRef        String?       @db.VarChar(255)
+  approverId        String?
+  status            PatternStatus @default(PENDING)
+  plotterRef        String?       @db.VarChar(100)
+  gradingNotes      String?       @db.Text
+  approvedAt        DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, patternNumber])
+  @@index([tenantId])
+  @@index([productionOrderId])
+  @@index([status])
+  @@map("pattern_records")
+}
+
+model CuttingOrder {
+  id                String        @id @default(cuid())
+  tenantId          String
+  productionOrderId String
+  orderNumber       String        @db.VarChar(100)
+  batchNumber       String        @db.VarChar(100)
+  targetQty         Int
+  cutQty            Int           @default(0)
+  wastagePercent    Decimal       @default(0) @db.Decimal(5, 2)
+  supervisorId      String?
+  fabricType        String?       @db.VarChar(255)
+  laborCost         Decimal?      @db.Decimal(15, 2)
+  status            CuttingStatus @default(PENDING)
+  isVerified        Boolean       @default(false)
+  verifiedById      String?
+  verifiedAt        DateTime?
+  cuttingDate       DateTime?
+  notes             String?       @db.Text
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, orderNumber])
+  @@index([tenantId])
+  @@index([productionOrderId])
+  @@index([status])
+  @@map("cutting_orders")
+}
+
+// =============================================================
+// QUALITY CONTROL
+// =============================================================
+
+model QualityCheck {
+  id               String             @id @default(cuid())
+  tenantId         String
+  productionOrderId String
+  checkNumber      String             @db.VarChar(100)
+  result           QualityCheckResult
+  inspectedQty     Int
+  passedQty        Int
+  failedQty        Int
+  reworkQty        Int                @default(0)
+  inspectedById    String?
+  inspectedAt      DateTime           @default(now())
+  notes            String?            @db.Text
+  approvedById     String?
+  approvedAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Restrict)
+  defects         DefectRecord[]
+  reworks         ReworkRecord[]
+  files           FileUpload[]
+
+  @@index([tenantId])
+  @@index([productionOrderId])
+  @@map("quality_checks")
+}
+
+model DefectRecord {
+  id             String         @id @default(cuid())
+  qualityCheckId String
+  defectCode     String         @db.VarChar(100)
+  defectName     String         @db.VarChar(255)
+  severity       DefectSeverity
+  quantity       Int
+  stageId        String?
+  description    String?        @db.Text
+
+  qualityCheck QualityCheck @relation(fields: [qualityCheckId], references: [id], onDelete: Cascade)
+
+  @@index([qualityCheckId])
+  @@map("defect_records")
+}
+
+model ReworkRecord {
+  id             String       @id @default(cuid())
+  qualityCheckId String
+  reworkType     String       @db.VarChar(255)
+  quantity       Int
+  status         ReworkStatus @default(PENDING)
+  assignedToId   String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  notes          String?      @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  qualityCheck QualityCheck @relation(fields: [qualityCheckId], references: [id], onDelete: Cascade)
+
+  @@index([qualityCheckId])
+  @@map("rework_records")
+}
+
+// =============================================================
+// FINISHED GOODS & POS INTEGRATION
+// =============================================================
+
+model PosConfig {
+  id              String  @id @default(cuid())
+  tenantId        String  @unique
+  posSystemName   String  @db.VarChar(100)
+  apiEndpoint     String? @db.VarChar(500)
+  apiKeyHash      String? @db.VarChar(500)
+  fieldMappings   Json
+  syncIntervalMin Int     @default(30)
+  isActive        Boolean @default(true)
+  lastSyncAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  syncLogs PosSyncLog[]
+
+  @@map("pos_configs")
+}
+
+model FinishedGood {
+  id              String  @id @default(cuid())
+  tenantId        String
+  sku             String  @db.VarChar(200)
+  name            String  @db.VarChar(255)
+  description     String? @db.Text
+  category        String? @db.VarChar(100)
+  color           String? @db.VarChar(100)
+  size            String? @db.VarChar(50)
+  quantity        Int     @default(0)
+  unitCost        Decimal @default(0) @db.Decimal(15, 4)
+  sellingPrice    Decimal @default(0) @db.Decimal(15, 4)
+  posItemId       String? @db.VarChar(255)
+  lastSyncedAt    DateTime?
+  isActive        Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  posMappings PosMappingRecord[]
+  saleRecords SaleRecord[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId])
+  @@index([posItemId])
+  @@map("finished_goods")
+}
+
+model PosMappingRecord {
+  id             String  @id @default(cuid())
+  tenantId       String
+  finishedGoodId String
+  posItemId      String  @db.VarChar(255)
+  posItemName    String? @db.VarChar(255)
+  fieldMappings  Json
+  isActive       Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  finishedGood FinishedGood @relation(fields: [finishedGoodId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, posItemId])
+  @@index([tenantId])
+  @@map("pos_mapping_records")
+}
+
+model PosSyncLog {
+  id          String     @id @default(cuid())
+  tenantId    String
+  posConfigId String
+  syncType    String     @db.VarChar(100)
+  status      SyncStatus @default(PENDING)
+  itemsSynced Int        @default(0)
+  itemsFailed Int        @default(0)
+  errorLog    Json?
+  startedAt   DateTime   @default(now())
+  completedAt DateTime?
+  retryCount  Int        @default(0)
+  nextRetryAt DateTime?
+
+  posConfig PosConfig @relation(fields: [posConfigId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([posConfigId])
+  @@index([status])
+  @@map("pos_sync_logs")
+}
+
+// =============================================================
+// SAAS — Subscriptions, Feature Flags, Billing
+// =============================================================
+
+model SubscriptionPlan {
+  id               String               @id @default(cuid())
+  name             String               @db.VarChar(100)
+  code             String               @unique @db.VarChar(50)
+  tier             SubscriptionPlanTier
+  description      String?              @db.Text
+  monthlyPrice     Decimal              @db.Decimal(10, 2)
+  annualPrice      Decimal              @db.Decimal(10, 2)
+  maxUsers         Int?
+  maxFactories     Int?
+  maxWarehouses    Int?
+  features         Json
+  isActive         Boolean              @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenantSubscriptions TenantSubscription[]
+
+  @@map("subscription_plans")
+}
+
+model TenantSubscription {
+  id                 String             @id @default(cuid())
+  tenantId           String             @unique
+  planId             String
+  status             SubscriptionStatus @default(TRIAL)
+  billingInterval    BillingInterval    @default(MONTHLY)
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  trialEndsAt        DateTime?
+  cancelledAt        DateTime?
+  externalSubId      String?            @db.VarChar(255)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant         Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  plan           SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  billingRecords BillingRecord[]
+
+  @@index([tenantId])
+  @@map("tenant_subscriptions")
+}
+
+model BillingRecord {
+  id                   String   @id @default(cuid())
+  tenantId             String
+  subscriptionId       String
+  invoiceNumber        String   @unique @db.VarChar(100)
+  amount               Decimal  @db.Decimal(10, 2)
+  currency             String   @default("USD") @db.VarChar(10)
+  status               String   @db.VarChar(50)
+  billingPeriodStart   DateTime
+  billingPeriodEnd     DateTime
+  paidAt               DateTime?
+  externalInvoiceId    String?  @db.VarChar(255)
+
+  createdAt DateTime @default(now())
+
+  subscription TenantSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([subscriptionId])
+  @@map("billing_records")
+}
+
+model FeatureFlag {
+  id          String  @id @default(cuid())
+  key         String  @unique @db.VarChar(100)
+  name        String  @db.VarChar(255)
+  description String? @db.Text
+  isGlobal    Boolean @default(false)
+  defaultOn   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenantFeatures TenantFeature[]
+
+  @@map("feature_flags")
+}
+
+model TenantFeature {
+  id            String  @id @default(cuid())
+  tenantId      String
+  featureFlagId String
+  isEnabled     Boolean @default(false)
+  overriddenAt  DateTime?
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  featureFlag FeatureFlag @relation(fields: [featureFlagId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, featureFlagId])
+  @@index([tenantId])
+  @@map("tenant_features")
+}
+
+// =============================================================
+// SYSTEM — Notifications, Audit, Activity, Files, Settings
+// =============================================================
+
+model Notification {
+  id          String              @id @default(cuid())
+  tenantId    String
+  userId      String?
+  type        NotificationType
+  channel     NotificationChannel @default(IN_APP)
+  title       String              @db.VarChar(255)
+  body        String              @db.Text
+  data        Json?
+  isRead      Boolean             @default(false)
+  readAt      DateTime?
+  sentAt      DateTime?
+
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([isRead])
+  @@index([type])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id           String      @id @default(cuid())
+  tenantId     String
+  userId       String?
+  action       AuditAction
+  entityType   String      @db.VarChar(100)
+  entityId     String      @db.VarChar(255)
+  oldValues    Json?
+  newValues    Json?
+  ipAddress    String?     @db.VarChar(50)
+  userAgent    String?     @db.VarChar(500)
+  description  String?     @db.VarChar(500)
+
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation("AuditUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model ActivityLog {
+  id          String  @id @default(cuid())
+  tenantId    String
+  userId      String?
+  module      String  @db.VarChar(100)
+  action      String  @db.VarChar(255)
+  description String? @db.VarChar(500)
+  metadata    Json?
+
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([module])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+model FileUpload {
+  id             String         @id @default(cuid())
+  tenantId       String
+  uploadedById   String?
+  entityType     FileEntityType
+  entityId       String         @db.VarChar(255)
+  originalName   String         @db.VarChar(500)
+  storedName     String         @db.VarChar(500)
+  mimeType       String         @db.VarChar(100)
+  sizeBytes      Int
+  storagePath    String         @db.VarChar(1000)
+  bucketName     String         @db.VarChar(255)
+  isPublic       Boolean        @default(false)
+  deletedAt      DateTime?
+
+  createdAt DateTime @default(now())
+
+  purchaseOrder     PurchaseOrder?     @relation(fields: [entityId], references: [id], map: "fk_file_purchase_order")
+  grn               GoodsReceivedNote? @relation(fields: [entityId], references: [id], map: "fk_file_grn")
+  productionOrder   ProductionOrder?   @relation(fields: [entityId], references: [id], map: "fk_file_production_order")
+  qualityCheck      QualityCheck?      @relation(fields: [entityId], references: [id], map: "fk_file_quality_check")
+
+  @@index([tenantId])
+  @@index([entityType, entityId])
+  @@map("file_uploads")
+}
+
+model SystemSetting {
+  id       String @id @default(cuid())
+  tenantId String
+  key      String @db.VarChar(200)
+  value    String @db.Text
+  category String @db.VarChar(100)
+  isPublic Boolean @default(false)
+
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+  @@map("system_settings")
+}
+
+// =============================================================
+// HR — Employees, Attendance, KPI
+// =============================================================
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+  ON_LEAVE
+}
+
+model Employee {
+  id           String    @id @default(cuid())
+  tenantId     String
+  employeeCode String    @db.VarChar(50)
+  firstName    String    @db.VarChar(100)
+  lastName     String    @db.VarChar(100)
+  email        String?   @db.VarChar(255)
+  phone        String?   @db.VarChar(50)
+  jobTitle     String?   @db.VarChar(100)
+  department   String?   @db.VarChar(100)
+  factoryId    String?
+  hireDate     DateTime? @db.Date
+  baseSalary   Decimal?  @db.Decimal(15, 2)
+  isActive     Boolean   @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  factory     Factory?     @relation(fields: [factoryId], references: [id], onDelete: SetNull)
+  attendances Attendance[]
+  kpiRecords  KpiRecord[]
+
+  @@unique([tenantId, employeeCode])
+  @@index([tenantId])
+  @@index([factoryId])
+  @@map("employees")
+}
+
+model Attendance {
+  id           String           @id @default(cuid())
+  tenantId     String
+  employeeId   String
+  date         DateTime         @db.Date
+  status       AttendanceStatus @default(PRESENT)
+  checkIn      String?          @db.VarChar(10)
+  checkOut     String?          @db.VarChar(10)
+  hoursWorked  Decimal?         @db.Decimal(4, 2)
+  notes        String?          @db.VarChar(500)
+  recordedById String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@unique([employeeId, date])
+  @@index([tenantId])
+  @@index([date])
+  @@map("attendance_records")
+}
+
+model KpiRecord {
+  id              String   @id @default(cuid())
+  tenantId        String
+  employeeId      String
+  month           Int
+  year            Int
+  metric          String   @db.VarChar(100)
+  target          Decimal? @db.Decimal(10, 2)
+  actual          Decimal  @db.Decimal(10, 2)
+  incentiveAmount Decimal? @db.Decimal(15, 2)
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@unique([employeeId, month, year, metric])
+  @@index([tenantId])
+  @@index([employeeId])
+  @@map("kpi_records")
+}
+
+// =============================================================
+// POS & SALES
+// =============================================================
+
+model SaleRecord {
+  id             String      @id @default(cuid())
+  tenantId       String
+  saleNumber     String      @db.VarChar(100)
+  finishedGoodId String
+  quantity       Int
+  unitPrice      Decimal     @db.Decimal(15, 2)
+  totalAmount    Decimal     @db.Decimal(15, 2)
+  customerName   String?     @db.VarChar(255)
+  channel        SaleChannel @default(POS)
+  status         SaleStatus  @default(COMPLETED)
+  notes          String?     @db.Text
+  saleDate       DateTime    @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  finishedGood FinishedGood @relation(fields: [finishedGoodId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([finishedGoodId])
+  @@index([saleDate])
+  @@map("sale_records")
+}
