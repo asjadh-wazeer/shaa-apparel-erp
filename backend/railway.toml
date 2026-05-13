@@ -1,7 +1,6 @@
 [build]
-builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile"
-dockerTarget = "production"
+builder = "NIXPACKS"
+buildCommand = "npx prisma generate && npm run build"
 
 [deploy]
 startCommand = "node dist/main"
