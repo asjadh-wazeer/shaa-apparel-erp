@@ -133,7 +133,7 @@ async function seedInventoryData(): Promise<void> {
     ]);
 
     await prisma.warehouseStock.createMany({
-      data: items.map((item: { id: string; costPerUnit: unknown }) => ({
+      data: items.map((item: { id: string; costPerUnit: number | null }) => ({
         warehouseId: warehouse.id,
         inventoryItemId: item.id,
         quantity: 100,
