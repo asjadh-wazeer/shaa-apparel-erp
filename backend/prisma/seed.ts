@@ -149,95 +149,107 @@ async function seedInventoryData(): Promise<void> {
 async function seedProductionStages(): Promise<void> {
   const tenants = await prisma.tenant.findMany({ where: { deletedAt: null } });
 
+  // These codes must match what the production pages query (DESIGN, PATTERN, SAMPLE, CUTTING, SEWING, QC, FINISHING)
   const defaultStages = [
-    { name: 'Design & Pattern', code: 'DESIGN', orderIndex: 1, isMandatory: true },
-    { name: 'Fabric Cutting', code: 'CUTTING', orderIndex: 2, isMandatory: true },
-    { name: 'Fusing', code: 'FUSING', orderIndex: 3, isMandatory: false },
-    { name: 'Stitching', code: 'STITCHING', orderIndex: 4, isMandatory: true },
-    { name: 'Checking (In-Line)', code: 'CHECK_INLINE', orderIndex: 5, isMandatory: false },
-    { name: 'Buttoning & Accessories', code: 'ACCESSORIES', orderIndex: 6, isMandatory: false },
-    { name: 'Ironing / Pressing', code: 'IRONING', orderIndex: 7, isMandatory: true },
-    { name: 'Final Quality Check', code: 'QC_FINAL', orderIndex: 8, isMandatory: true },
-    { name: 'Folding & Packing', code: 'PACKING', orderIndex: 9, isMandatory: true },
-    { name: 'Tagging', code: 'TAGGING', orderIndex: 10, isMandatory: false },
-    { name: 'Dispatch', code: 'DISPATCH', orderIndex: 11, isMandatory: true },
+    { name: 'Design & Review',   code: 'DESIGN',    orderIndex: 1, isMandatory: true  },
+    { name: 'Pattern Making',    code: 'PATTERN',   orderIndex: 2, isMandatory: true  },
+    { name: 'Sample Making',     code: 'SAMPLE',    orderIndex: 3, isMandatory: false },
+    { name: 'Cutting',           code: 'CUTTING',   orderIndex: 4, isMandatory: true  },
+    { name: 'Sewing',            code: 'SEWING',    orderIndex: 5, isMandatory: true  },
+    { name: 'Quality Control',   code: 'QC',        orderIndex: 6, isMandatory: true  },
+    { name: 'Finishing',         code: 'FINISHING', orderIndex: 7, isMandatory: true  },
   ];
 
   for (const tenant of tenants) {
-    await prisma.productionStageConfig.createMany({
-      data: defaultStages.map((s) => ({ ...s, tenantId: tenant.id })),
-      skipDuplicates: true,
-    });
+    for (const stage of defaultStages) {
+      await prisma.productionStageConfig.upsert({
+        where: { tenantId_code: { tenantId: tenant.id, code: stage.code } },
+        create: { ...stage, tenantId: tenant.id },
+        update: { name: stage.name, orderIndex: stage.orderIndex, isMandatory: stage.isMandatory, isActive: true },
+      });
+    }
   }
-  console.log('✅ Production stages seeded (11-stage workflow)');
+  console.log('✅ Production stages seeded/updated (7-stage workflow: DESIGN→PATTERN→SAMPLE→CUTTING→SEWING→QC→FINISHING)');
 }
 
 async function seedProductionData(): Promise<void> {
   const tenants = await prisma.tenant.findMany({ where: { deletedAt: null } });
 
   for (const tenant of tenants) {
-    const existing = await prisma.productionOrder.count({ where: { tenantId: tenant.id } });
-    if (existing > 0) {
-      console.log('ℹ️  Production data already exists — skipping');
-      continue;
-    }
+    // Always rebuild production data so each stage has demo batches
+    await prisma.qualityCheck.deleteMany({ where: { tenantId: tenant.id } });
+    await prisma.productionStageHistory.deleteMany({
+      where: { batch: { productionOrder: { tenantId: tenant.id } } },
+    });
+    await prisma.productionBatch.deleteMany({ where: { productionOrder: { tenantId: tenant.id } } });
+    await prisma.productionOrder.deleteMany({ where: { tenantId: tenant.id } });
 
-    type StageConfig = { id: string; code: string; name: string; orderIndex: number; isMandatory: boolean; tenantId: string };
+    type StageConfig = { id: string; code: string; orderIndex: number };
     const stages = await prisma.productionStageConfig.findMany({
-      where: { tenantId: tenant.id },
+      where: { tenantId: tenant.id, isActive: true },
       orderBy: { orderIndex: 'asc' },
     }) as StageConfig[];
     if (stages.length === 0) continue;
 
-    const cuttingStage  = stages.find((s: StageConfig) => s.code === 'CUTTING');
-    const stitchStage   = stages.find((s: StageConfig) => s.code === 'STITCHING');
-    const qcStage       = stages.find((s: StageConfig) => s.code === 'QC_FINAL');
-    const designStage   = stages.find((s: StageConfig) => s.code === 'DESIGN');
+    const getStage = (code: string) => stages.find((s: StageConfig) => s.code === code);
 
-    const orders = [
-      { orderNumber: 'PO-2026-001', description: 'Cotton Blouse — Summer Collection', plannedQty: 120, status: 'IN_PROGRESS' as const, priority: 8, plannedStartDate: new Date('2026-05-01'), plannedEndDate: new Date('2026-05-25') },
-      { orderNumber: 'PO-2026-002', description: 'Denim Skirt — A-Line Grey', plannedQty: 80,  status: 'IN_PROGRESS' as const, priority: 6, plannedStartDate: new Date('2026-05-05'), plannedEndDate: new Date('2026-05-28') },
-      { orderNumber: 'PO-2026-003', description: 'Office Blouse Ivory — Vol.2', plannedQty: 200, status: 'PLANNED' as const, priority: 5, plannedStartDate: new Date('2026-05-20'), plannedEndDate: new Date('2026-06-10') },
+    // One order per stage so each department page shows data
+    const orderDefs = [
+      { orderNumber: 'PO-2026-001', description: 'Cotton Blouse — Summer Collection',  plannedQty: 120, priority: 1, atStage: 'DESIGN'    },
+      { orderNumber: 'PO-2026-002', description: 'Denim Skirt — A-Line Grey',          plannedQty: 80,  priority: 2, atStage: 'PATTERN'   },
+      { orderNumber: 'PO-2026-003', description: 'Office Blouse Ivory — Vol.2',        plannedQty: 200, priority: 3, atStage: 'SAMPLE'    },
+      { orderNumber: 'PO-2026-004', description: 'Crop Top Black — Basic Range',       plannedQty: 150, priority: 4, atStage: 'CUTTING'   },
+      { orderNumber: 'PO-2026-005', description: 'Frock Summer Floral — Midi',         plannedQty: 60,  priority: 5, atStage: 'SEWING'    },
     ];
 
-    for (const orderData of orders) {
+    for (const def of orderDefs) {
+      const currentStage = getStage(def.atStage);
+      if (!currentStage) continue;
+
       const order = await prisma.productionOrder.create({
-        data: { tenantId: tenant.id, ...orderData },
+        data: {
+          tenantId: tenant.id,
+          orderNumber: def.orderNumber,
+          description: def.description,
+          plannedQty: def.plannedQty,
+          priority: def.priority,
+          status: 'IN_PROGRESS',
+          plannedStartDate: new Date('2026-05-01'),
+          plannedEndDate: new Date('2026-06-30'),
+        },
       });
 
       const batch = await prisma.productionBatch.create({
         data: {
           productionOrderId: order.id,
-          batchNumber: `${order.orderNumber}-B1`,
-          status: orderData.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'OPEN',
-          plannedQty: order.plannedQty,
-          startedAt: orderData.status === 'IN_PROGRESS' ? new Date() : undefined,
-          currentStageId: orderData.status === 'IN_PROGRESS' ? (cuttingStage?.id ?? undefined) : undefined,
+          batchNumber: `${def.orderNumber}-B1`,
+          status: 'IN_PROGRESS',
+          plannedQty: def.plannedQty,
+          startedAt: new Date(),
+          currentStageId: currentStage.id,
         },
       });
 
-      // Seed stage histories for in-progress orders
-      if (orderData.status === 'IN_PROGRESS' && stages.length > 0) {
-        const stageData = stages.map((stage: StageConfig) => {
-          let status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' = 'PENDING';
-          if (stage.code === 'DESIGN') status = 'COMPLETED';
-          if (stage.code === 'CUTTING') status = 'IN_PROGRESS';
-          return {
-            batchId:       batch.id,
-            stageConfigId: stage.id,
-            plannedQty:    order.plannedQty,
-            completedQty:  status === 'COMPLETED' ? order.plannedQty : 0,
-            status,
-            startedAt:     status !== 'PENDING' ? new Date() : undefined,
-            completedAt:   status === 'COMPLETED' ? new Date() : undefined,
-          };
-        });
-        await prisma.productionStageHistory.createMany({ data: stageData, skipDuplicates: true });
-      }
+      // Stage histories: all stages up to current are COMPLETED, current is IN_PROGRESS, rest PENDING
+      const stageHistories = stages.map((stage: StageConfig) => {
+        let status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' = 'PENDING';
+        if (stage.orderIndex < currentStage.orderIndex) status = 'COMPLETED';
+        if (stage.orderIndex === currentStage.orderIndex) status = 'IN_PROGRESS';
+        return {
+          batchId:       batch.id,
+          stageConfigId: stage.id,
+          plannedQty:    def.plannedQty,
+          completedQty:  status === 'COMPLETED' ? def.plannedQty : 0,
+          status,
+          startedAt:     status !== 'PENDING'   ? new Date() : undefined,
+          completedAt:   status === 'COMPLETED' ? new Date() : undefined,
+        };
+      });
+
+      await prisma.productionStageHistory.createMany({ data: stageHistories });
     }
 
-    console.log(`✅ Production data seeded for tenant "${tenant.name}": ${orders.length} orders`);
-    void (cuttingStage && stitchStage && qcStage && designStage); // suppress unused warnings
+    console.log(`✅ Production data seeded for tenant "${tenant.name}": ${orderDefs.length} orders across all stages`);
   }
 }
 
