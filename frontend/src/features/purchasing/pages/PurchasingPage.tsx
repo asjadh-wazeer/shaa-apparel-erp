@@ -233,7 +233,7 @@ function CreateGrnModal({ po, isOpen, onClose }: { po: PurchaseOrder; isOpen: bo
     resolver: zodResolver(grnSchema),
     defaultValues: {
       receivedDate: new Date().toISOString().slice(0, 10),
-      items: po.items.map((item) => ({
+      items: (po.items ?? []).map((item) => ({
         inventoryItemId: item.inventoryItemId,
         receivedQty:     Number(item.orderedQty) - Number(item.receivedQty),
         acceptedQty:     Number(item.orderedQty) - Number(item.receivedQty),
@@ -313,7 +313,7 @@ function CreateGrnModal({ po, isOpen, onClose }: { po: PurchaseOrder; isOpen: bo
                 </tr>
               </thead>
               <tbody>
-                {po.items.map((item, idx) => (
+                {(po.items ?? []).map((item, idx) => (
                   <tr key={item.id} className="border-b border-gray-100">
                     <td className="px-3 py-2 font-medium text-gray-700 whitespace-nowrap">
                       {item.inventoryItem.name}
@@ -389,7 +389,7 @@ function PoDetailPanel({ po, onClose }: { po: PurchaseOrder; onClose: () => void
             </tr>
           </thead>
           <tbody>
-            {po.items.map((item) => (
+            {(po.items ?? []).map((item) => (
               <tr key={item.id} className="border-b border-gray-50">
                 <td className="py-2 pr-4 font-medium text-gray-700 whitespace-nowrap">
                   {item.inventoryItem.name}
@@ -418,7 +418,7 @@ function PoDetailPanel({ po, onClose }: { po: PurchaseOrder; onClose: () => void
               <div key={grn.id} className="flex items-center justify-between bg-amber-50 rounded-lg px-3 py-2">
                 <div className="text-xs">
                   <span className="font-semibold text-gray-700">{grn.grnNumber}</span>
-                  <span className="text-gray-500 ml-2">{grn.items.length} items</span>
+                  <span className="text-gray-500 ml-2">{grn.items?.length ?? 0} items</span>
                 </div>
                 <Button
                   size="xs"
@@ -560,7 +560,7 @@ export function PurchasingPage(): React.JSX.Element {
                     >
                       <td className="px-4 py-3 font-mono text-xs font-semibold text-gray-700">{po.poNumber}</td>
                       <td className="px-4 py-3 font-medium text-gray-800 whitespace-nowrap">{po.supplier.name}</td>
-                      <td className="px-4 py-3 text-gray-500 text-xs">{po.items.length} line{po.items.length !== 1 ? 's' : ''}</td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">{po.items?.length ?? 0} line{(po.items?.length ?? 0) !== 1 ? 's' : ''}</td>
                       <td className="px-4 py-3 font-semibold text-gray-800">
                         {Number(po.totalAmount).toLocaleString()}
                       </td>

@@ -71,7 +71,7 @@ function computeProgress(stageHistories: StageHistory[]): number {
 }
 
 function getCurrentStageName(batch: ProductionBatch): string {
-  const current = batch.stageHistories.find((h) => h.status === 'IN_PROGRESS');
+  const current = batch.stageHistories?.find((h) => h.status === 'IN_PROGRESS');
   return current?.stageConfig.name ?? (batch.status === 'COMPLETED' ? 'Done' : 'Pending');
 }
 
@@ -268,7 +268,7 @@ interface AdvanceStageModalProps {
 
 function AdvanceStageModal({ order, batch, isOpen, onClose }: AdvanceStageModalProps): React.JSX.Element {
   const [advanceStage, { isLoading }] = useAdvanceStageMutation();
-  const currentStage = batch.stageHistories.find((h) => h.status === 'IN_PROGRESS');
+  const currentStage = batch.stageHistories?.find((h) => h.status === 'IN_PROGRESS');
   const { register, handleSubmit, reset, formState: { errors } } = useForm<AdvanceForm>({
     resolver: zodResolver(advanceSchema),
     defaultValues: { completedQty: batch.plannedQty, rejectedQty: 0 },
@@ -337,7 +337,7 @@ function OrderCard({ order }: OrderCardProps): React.JSX.Element {
   const [showBatchModal, setShowBatchModal]     = useState(false);
   const [advanceBatch, setAdvanceBatch]         = useState<ProductionBatch | null>(null);
 
-  const activeBatches = order.batches.filter((b) => b.status !== 'CANCELLED');
+  const activeBatches = (order.batches ?? []).filter((b) => b.status !== 'CANCELLED');
   const hasBatch      = activeBatches.length > 0;
   const firstBatch    = activeBatches[0];
 

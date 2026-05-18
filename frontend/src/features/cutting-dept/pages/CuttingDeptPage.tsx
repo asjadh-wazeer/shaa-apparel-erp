@@ -26,7 +26,7 @@ interface AdvanceModalProps {
 
 function AdvanceModal({ batch, isOpen, onClose }: AdvanceModalProps): React.JSX.Element {
   const [advance, { isLoading }] = useAdvanceStageMutation();
-  const currentStage = batch.stageHistories.find((h) => h.status === 'IN_PROGRESS');
+  const currentStage = batch.stageHistories?.find((h) => h.status === 'IN_PROGRESS');
   const { register, handleSubmit, reset, formState: { errors } } = useForm<AdvanceForm>({
     resolver: zodResolver(advanceSchema),
     defaultValues: { completedQty: batch.plannedQty, rejectedQty: 0 },
@@ -161,7 +161,7 @@ export function CuttingDeptPage(): React.JSX.Element {
               </thead>
               <tbody>
                 {batches.map((batch) => {
-                  const cuttingHistory = batch.stageHistories.find(
+                  const cuttingHistory = batch.stageHistories?.find(
                     (h) => h.stageConfig.code === 'CUTTING',
                   );
                   const completedQty = cuttingHistory?.completedQty ?? 0;

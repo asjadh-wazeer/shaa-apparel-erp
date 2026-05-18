@@ -307,10 +307,10 @@ export function PhotoDistributionPage(): React.JSX.Element {
                   )}
                 </div>
               </div>
-              {record.channels.length > 0 && (
+              {(record.channels?.length ?? 0) > 0 && (
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs text-gray-500">Distributed to:</span>
-                  {record.channels.map((ch) => (
+                  {(record.channels ?? []).map((ch) => (
                     <span key={ch} className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${channelColors[ch as Channel] ?? 'bg-gray-100 text-gray-600'}`}>
                       {ch}
                     </span>

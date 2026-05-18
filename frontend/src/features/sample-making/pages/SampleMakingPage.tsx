@@ -20,7 +20,7 @@ type AdvanceForm = z.infer<typeof advanceSchema>;
 
 function ApproveSampleModal({ batch, isOpen, onClose }: { batch: ProductionBatch; isOpen: boolean; onClose: () => void }): React.JSX.Element {
   const [advance, { isLoading }] = useAdvanceStageMutation();
-  const currentStage = batch.stageHistories.find((h) => h.status === 'IN_PROGRESS');
+  const currentStage = batch.stageHistories?.find((h) => h.status === 'IN_PROGRESS');
   const { register, handleSubmit, reset, formState: { errors } } = useForm<AdvanceForm>({
     resolver: zodResolver(advanceSchema),
     defaultValues: { completedQty: batch.plannedQty, rejectedQty: 0 },
@@ -147,7 +147,7 @@ export function SampleMakingPage(): React.JSX.Element {
               </thead>
               <tbody>
                 {batches.map((batch) => {
-                  const sampleHistory = batch.stageHistories.find((h) => h.stageConfig.code === 'SAMPLE');
+                  const sampleHistory = batch.stageHistories?.find((h) => h.stageConfig.code === 'SAMPLE');
                   const completedQty = sampleHistory?.completedQty ?? 0;
                   const pct = batch.plannedQty > 0 ? Math.round((completedQty / batch.plannedQty) * 100) : 0;
                   const isComplete = batch.status === 'COMPLETED';

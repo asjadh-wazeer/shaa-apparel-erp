@@ -312,9 +312,9 @@ export function UserRolesPage(): React.JSX.Element {
                         <td className="px-4 py-3 text-gray-500 text-xs">{row.email}</td>
                         <td className="px-4 py-3 text-gray-500 text-xs font-mono">{row.username}</td>
                         <td className="px-4 py-3">
-                          {row.roles.length > 0 ? (
+                          {(row.roles?.length ?? 0) > 0 ? (
                             <span className="rounded px-2 py-0.5 text-xs bg-blue-50 text-blue-700 font-medium whitespace-nowrap">
-                              {row.roles[0].name}
+                              {row.roles?.[0]?.name}
                             </span>
                           ) : (
                             <span className="text-xs text-gray-400">—</span>

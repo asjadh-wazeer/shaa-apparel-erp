@@ -613,9 +613,9 @@ export function QualityControlPage(): React.JSX.Element {
                           ) : <span className="text-gray-300">—</span>}
                         </td>
                         <td className="px-4 py-3 text-xs">
-                          {check.defects.length > 0 ? (
+                          {(check.defects?.length ?? 0) > 0 ? (
                             <span className="bg-orange-100 text-orange-700 rounded-full px-2 py-0.5 font-semibold">
-                              {check.defects.length} types
+                              {check.defects?.length ?? 0} types
                             </span>
                           ) : <span className="text-gray-300">—</span>}
                         </td>
@@ -692,7 +692,7 @@ export function QualityControlPage(): React.JSX.Element {
                 </thead>
                 <tbody>
                   {checks.flatMap((check) =>
-                    check.defects.map((d) => (
+                    (check.defects ?? []).map((d) => (
                       <tr key={d.id} className="border-b border-gray-50 hover:bg-gray-50">
                         <td className="px-4 py-3 font-mono text-xs text-gray-600">{check.checkNumber}</td>
                         <td className="px-4 py-3 text-xs text-gray-500">{check.productionOrder?.orderNumber ?? '—'}</td>
@@ -708,7 +708,7 @@ export function QualityControlPage(): React.JSX.Element {
                       </tr>
                     )),
                   )}
-                  {checks.every((c) => c.defects.length === 0) && (
+                  {checks.every((c) => (c.defects?.length ?? 0) === 0) && (
                     <tr>
                       <td colSpan={7} className="px-4 py-10 text-center text-gray-400 text-sm">
                         No defects recorded for the current inspections.
