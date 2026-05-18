@@ -38,6 +38,7 @@ import { PosIntegrationModule } from './modules/pos-integration/pos-integration.
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { FeatureFlagsModule } from './modules/feature-flags/feature-flags.module';
 import { FileManagementModule } from './modules/file-management/file-management.module';
+import { DesignSubmissionsModule } from './modules/design-submissions/design-submissions.module';
 
 @Module({
   imports: [
@@ -113,6 +114,7 @@ import { FileManagementModule } from './modules/file-management/file-management.
     SubscriptionsModule,
     FeatureFlagsModule,
     FileManagementModule,
+    DesignSubmissionsModule,
   ],
 })
 export class AppModule {}

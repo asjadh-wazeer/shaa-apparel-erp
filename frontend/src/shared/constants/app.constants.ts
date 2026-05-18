@@ -21,6 +21,7 @@ export const ROUTES = {
   ATTENDANCE: '/attendance',
   KPI_INCENTIVES: '/kpi-incentives',
   REPORTS: '/reports',
+  AUDIT_LOG: '/audit-log',
   USER_ROLES: '/user-roles',
   // legacy kept for compat
   PRODUCTION: '/production',

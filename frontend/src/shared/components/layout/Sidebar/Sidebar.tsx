@@ -84,6 +84,7 @@ const navSections: NavSection[] = [
       { label: 'Attendance',  path: ROUTES.ATTENDANCE,    emoji: '👥', roles: ['attendance'] },
       { label: 'KPI & Incentives', path: ROUTES.KPI_INCENTIVES, emoji: '📈', roles: ['kpi_incentives'] },
       { label: 'Reports',     path: ROUTES.REPORTS,       emoji: '📄', roles: ['reports'] },
+      { label: 'Audit Log',   path: ROUTES.AUDIT_LOG,     emoji: '🔍', roles: ['user_roles'] },
       { label: 'User & Roles', path: ROUTES.USER_ROLES,   emoji: '👤', roles: ['user_roles'] },
     ],
   },

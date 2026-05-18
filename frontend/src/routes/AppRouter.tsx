@@ -81,6 +81,9 @@ const ReportsPage = lazy(() =>
 const UserRolesPage = lazy(() =>
   import('../features/user-roles/pages/UserRolesPage').then((m) => ({ default: m.UserRolesPage })),
 );
+const AuditLogPage = lazy(() =>
+  import('../features/audit-log/pages/AuditLogPage').then((m) => ({ default: m.AuditLogPage })),
+);
 
 const SuspenseFallback = (): React.JSX.Element => (
   <LoadingState message="Loading page..." />
@@ -125,6 +128,7 @@ export function AppRouter(): React.JSX.Element {
               <Route path={ROUTES.ATTENDANCE} element={<AttendancePage />} />
               <Route path={ROUTES.KPI_INCENTIVES} element={<KPIIncentivesPage />} />
               <Route path={ROUTES.REPORTS} element={<ReportsPage />} />
+              <Route path={ROUTES.AUDIT_LOG} element={<AuditLogPage />} />
               <Route path={ROUTES.USER_ROLES} element={<UserRolesPage />} />
 
               {/* Legacy redirects for old routes */}

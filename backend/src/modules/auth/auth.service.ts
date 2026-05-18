@@ -85,6 +85,31 @@ export class AuthService {
 
     this.logger.log(`User ${user.email} logged in from ${ipAddress}`);
 
+    // Auto-record attendance check-in when employee email matches user email
+    try {
+      const now = new Date();
+      const checkInTime = now.toTimeString().slice(0, 5);
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const employee = await this.prisma.employee.findFirst({
+        where: { email: user.email, tenantId: user.tenantId, deletedAt: null },
+      });
+      if (employee) {
+        await this.prisma.attendance.upsert({
+          where: { employeeId_date: { employeeId: employee.id, date: today } },
+          update: {},
+          create: {
+            employeeId: employee.id,
+            tenantId: user.tenantId,
+            date: today,
+            checkIn: checkInTime,
+            status: 'PRESENT',
+          },
+        });
+      }
+    } catch (err) {
+      this.logger.warn(`Auto-attendance check-in failed for ${user.email}: ${err}`);
+    }
+
     return {
       user: {
         id: user.id,
@@ -152,6 +177,30 @@ export class AuthService {
       where: { userId, loggedOutAt: null },
       data: { loggedOutAt: new Date() },
     });
+
+    // Auto-record attendance check-out
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, tenantId: true },
+      });
+      if (user) {
+        const now = new Date();
+        const checkOutTime = now.toTimeString().slice(0, 5);
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const employee = await this.prisma.employee.findFirst({
+          where: { email: user.email, tenantId: user.tenantId, deletedAt: null },
+        });
+        if (employee) {
+          await this.prisma.attendance.updateMany({
+            where: { employeeId: employee.id, date: today },
+            data: { checkOut: checkOutTime },
+          });
+        }
+      }
+    } catch (err) {
+      this.logger.warn(`Auto-attendance check-out failed for userId ${userId}: ${err}`);
+    }
   }
 
   async logoutAll(userId: string): Promise<void> {

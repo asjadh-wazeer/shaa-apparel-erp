@@ -367,6 +367,14 @@ function OrderCard({ order }: OrderCardProps): React.JSX.Element {
               {currentStage}
             </span>
           )}
+          {order.plannedEndDate &&
+            new Date(order.plannedEndDate) < new Date() &&
+            order.status !== 'COMPLETED' &&
+            order.status !== 'CANCELLED' && (
+              <span className="rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-100 text-red-700">
+                Overdue
+              </span>
+            )}
           <span className="ml-auto text-xs text-gray-400 font-medium">
             Priority: {order.priority} · Qty: {order.plannedQty}
           </span>

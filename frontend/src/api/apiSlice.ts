@@ -87,6 +87,7 @@ export const apiSlice = createApi({
     'FinishedGood',
     'Notification',
     'AuditLog',
+    'DesignSubmission',
     'Dashboard',
     'SaleRecord',
     'PosConfig',

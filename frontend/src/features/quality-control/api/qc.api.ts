@@ -68,6 +68,20 @@ export const qcApi = apiSlice.injectEndpoints({
       ],
     }),
 
+    uploadQcPhoto: builder.mutation<{ success: boolean; data: { id: string; originalName: string; storedName: string; mimeType: string; sizeBytes: number } }, { id: string; file: File }>({
+      query: ({ id, file }) => {
+        const body = new FormData();
+        body.append('file', file);
+        return { url: `/quality-control/${id}/photos`, method: 'POST', body };
+      },
+      invalidatesTags: (_, __, { id }) => [{ type: 'QualityCheck', id: `PHOTOS_${id}` }],
+    }),
+
+    getQcPhotos: builder.query<{ success: boolean; data: Array<{ id: string; originalName: string; storedName: string; mimeType: string; sizeBytes: number; createdAt: string }> }, string>({
+      query: (id) => `/quality-control/${id}/photos`,
+      providesTags: (_, __, id) => [{ type: 'QualityCheck', id: `PHOTOS_${id}` }],
+    }),
+
     addRework: builder.mutation<ApiResponse<ReworkRecord>, { checkId: string; data: AddReworkPayload }>({
       query: ({ checkId, data }) => ({ url: `/quality-control/${checkId}/reworks`, method: 'POST', body: data }),
       invalidatesTags: (_, __, { checkId }) => [{ type: 'QualityCheck', id: checkId }],
@@ -92,6 +106,8 @@ export const {
   useUpdateQualityCheckMutation,
   useApproveQualityCheckMutation,
   useDeleteQualityCheckMutation,
+  useUploadQcPhotoMutation,
+  useGetQcPhotosQuery,
   useAddReworkMutation,
   useUpdateReworkMutation,
 } = qcApi;

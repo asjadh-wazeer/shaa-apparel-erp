@@ -253,6 +253,59 @@ async function seedProductionData(): Promise<void> {
   }
 }
 
+async function seedEmployees(): Promise<void> {
+  const tenants = await prisma.tenant.findMany({ where: { deletedAt: null } });
+
+  for (const tenant of tenants) {
+    const existing = await prisma.employee.count({ where: { tenantId: tenant.id } });
+    if (existing > 0) {
+      console.log('ℹ️  Employees already exist — skipping');
+      continue;
+    }
+
+    await prisma.employee.createMany({
+      data: [
+        {
+          tenantId: tenant.id,
+          employeeCode: 'EMP-001',
+          firstName: 'System',
+          lastName: 'Admin',
+          email: 'admin@shaaapparel.com',
+          jobTitle: 'Administrator',
+          department: 'Management',
+          hireDate: new Date('2024-01-01'),
+          isActive: true,
+        },
+        {
+          tenantId: tenant.id,
+          employeeCode: 'EMP-002',
+          firstName: 'QC',
+          lastName: 'Inspector',
+          email: 'qc@shaaapparel.com',
+          jobTitle: 'QC Inspector',
+          department: 'Quality Control',
+          hireDate: new Date('2024-01-01'),
+          isActive: true,
+        },
+        {
+          tenantId: tenant.id,
+          employeeCode: 'EMP-003',
+          firstName: 'Production',
+          lastName: 'Manager',
+          email: 'production@shaaapparel.com',
+          jobTitle: 'Production Manager',
+          department: 'Production',
+          hireDate: new Date('2024-01-01'),
+          isActive: true,
+        },
+      ],
+      skipDuplicates: true,
+    });
+
+    console.log(`✅ Employees seeded for tenant "${tenant.name}"`);
+  }
+}
+
 async function main(): Promise<void> {
   console.log('🌱 Starting database seed...');
   await seedPermissions();
@@ -260,6 +313,7 @@ async function main(): Promise<void> {
   await seedInventoryData();
   await seedProductionStages();
   await seedProductionData();
+  await seedEmployees();
   console.log('🎉 Seed completed successfully!');
 }
 

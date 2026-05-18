@@ -11,6 +11,8 @@ import {
   useApproveQualityCheckMutation,
   useDeleteQualityCheckMutation,
   useUpdateReworkMutation,
+  useUploadQcPhotoMutation,
+  useGetQcPhotosQuery,
 } from '../api/qc.api';
 import type { QualityCheck, DefectSeverity, ReworkRecord, ReworkStatus } from '../types/qc.types';
 import { useGetProductionOrdersQuery } from '../../production/api/production.api';
@@ -86,9 +88,15 @@ function QcCheckModal({ isOpen, onClose }: QcCheckModalProps): React.JSX.Element
   const { data: ordersData } = useGetProductionOrdersQuery({ limit: 100 });
   const orders = ordersData?.data ?? [];
 
+  const [autoCheckNo] = useState(() => {
+    const ts = Date.now().toString().slice(-6);
+    return `QC-${new Date().getFullYear()}-${ts}`;
+  });
+
   const { register, handleSubmit, control, reset, watch, formState: { errors } } = useForm<CheckForm>({
     resolver: zodResolver(checkSchema),
     defaultValues: {
+      checkNumber: autoCheckNo,
       result: 'PASSED',
       inspectedQty: 0,
       passedQty: 0,
@@ -244,9 +252,22 @@ interface CheckDetailPanelProps {
   onClose: () => void;
 }
 
+const BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL ?? '/api/v1';
+
 function CheckDetailPanel({ check, onClose }: CheckDetailPanelProps): React.JSX.Element {
   const [approve, { isLoading: approving }] = useApproveQualityCheckMutation();
   const [updateRework, { isLoading: updatingRework }] = useUpdateReworkMutation();
+  const [uploadPhoto, { isLoading: uploading }] = useUploadQcPhotoMutation();
+  const { data: photosData, refetch: refetchPhotos } = useGetQcPhotosQuery(check.id);
+  const photos = photosData?.data ?? [];
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await uploadPhoto({ id: check.id, file }).unwrap();
+    refetchPhotos();
+    e.target.value = '';
+  };
 
   const passRate = check.inspectedQty > 0
     ? ((check.passedQty / check.inspectedQty) * 100).toFixed(1)
@@ -305,6 +326,51 @@ function CheckDetailPanel({ check, onClose }: CheckDetailPanelProps): React.JSX.
           {check.notes && (
             <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-800">{check.notes}</div>
           )}
+
+          {/* Photos */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-gray-700">Photos ({photos.length})</h3>
+              <label className={[
+                'cursor-pointer px-3 py-1 rounded text-xs font-semibold bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition-colors',
+                uploading ? 'opacity-50 pointer-events-none' : '',
+              ].join(' ')}>
+                {uploading ? 'Uploading…' : '+ Upload Photo'}
+                <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
+              </label>
+            </div>
+            {photos.length === 0 ? (
+              <p className="text-xs text-gray-400">No photos uploaded yet.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {photos.map((photo) => (
+                  <a
+                    key={photo.id}
+                    href={`${BASE_URL}/file-management/serve/${photo.storedName}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-20 h-20 rounded-lg border border-gray-200 overflow-hidden bg-gray-50 hover:border-indigo-400 transition-colors"
+                    title={photo.originalName}
+                  >
+                    {photo.mimeType.startsWith('image/') ? (
+                      <img
+                        src={`${BASE_URL}/file-management/serve/${photo.storedName}`}
+                        alt={photo.originalName}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
+                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span className="text-xs mt-1">PDF</span>
+                      </div>
+                    )}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Defects */}
           {check.defects.length > 0 && (
