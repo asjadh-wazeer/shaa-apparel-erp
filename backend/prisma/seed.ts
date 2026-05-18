@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, InventoryItem } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -133,11 +133,11 @@ async function seedInventoryData(): Promise<void> {
     ]);
 
     await prisma.warehouseStock.createMany({
-      data: items.map((item: { id: string; costPerUnit: number | null }) => ({
+      data: (items as InventoryItem[]).map((item) => ({
         warehouseId: warehouse.id,
         inventoryItemId: item.id,
         quantity: 100,
-        avgCostPerUnit: item.costPerUnit,
+        avgCostPerUnit: item.costPerUnit ?? undefined,
       })),
       skipDuplicates: true,
     });
