@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAppSelector } from '../../../store';
 
 type Tab = 'pending' | 'approved' | 'rejected';
 
@@ -11,7 +12,7 @@ interface DesignRow {
   status: 'PENDING APPROVAL' | 'APPROVED' | 'REJECTED';
 }
 
-const allDesigns: DesignRow[] = [
+const initialDesigns: DesignRow[] = [
   {
     reviewNo: 'DES-2204',
     product: 'Crop Top Black',
@@ -60,9 +61,98 @@ const statusStyle: Record<string, string> = {
   REJECTED: 'bg-red-100 text-red-700',
 };
 
+const AVAILABLE_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '28/MB', '30/MB', '32/MB', '34/MB', '36/MB', '38/MB'];
+
+function SubmitDesignModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (product: string, sizes: string[]) => void }) {
+  const [product, setProduct] = useState('');
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  const [error, setError] = useState('');
+
+  const toggleSize = (size: string) => {
+    setSelectedSizes((prev: string[]) =>
+      prev.includes(size) ? prev.filter((s: string) => s !== size) : [...prev, size],
+    );
+  };
+
+  const handleSubmit = () => {
+    if (!product.trim()) { setError('Product name is required'); return; }
+    if (selectedSizes.length === 0) { setError('Select at least one size'); return; }
+    onSubmit(product.trim(), selectedSizes);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h2 className="text-base font-semibold text-gray-900">Submit New Design</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="p-5 space-y-4">
+          {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+          <div>
+            <label className="form-label">Product Name <span className="text-red-500">*</span></label>
+            <input
+              type="text"
+              className="input w-full"
+              placeholder="e.g. Summer Blouse White"
+              value={product}
+              onChange={(e) => { setProduct(e.target.value); setError(''); }}
+            />
+          </div>
+          <div>
+            <label className="form-label">Submitted Sizes <span className="text-red-500">*</span></label>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {AVAILABLE_SIZES.map((size) => (
+                <button
+                  key={size}
+                  type="button"
+                  onClick={() => { toggleSize(size); setError(''); }}
+                  className={[
+                    'px-2.5 py-1 rounded text-xs font-mono font-medium border transition-colors',
+                    selectedSizes.includes(size)
+                      ? 'bg-blue-600 border-blue-600 text-white'
+                      : 'bg-white border-gray-300 text-gray-600 hover:border-blue-400',
+                  ].join(' ')}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-xl">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Submit for Review
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const ADMIN_ROLES = ['TENANT_ADMIN', 'admin', 'ADMIN', 'General Manager', 'CEO & Founder', 'Production Manager'];
+
 export function DesignModulePage(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<Tab>('pending');
-  const [designs, setDesigns] = useState<DesignRow[]>(allDesigns);
+  const [designs, setDesigns] = useState<DesignRow[]>(initialDesigns);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+
+  const user = useAppSelector((s) => s.auth.user);
+  const userRoles = user?.roles ?? [];
+  const isAdmin = userRoles.some((r) => ADMIN_ROLES.includes(r)) || userRoles.length === 0;
 
   const tabFilter: Record<Tab, DesignRow['status']> = {
     pending: 'PENDING APPROVAL',
@@ -84,6 +174,25 @@ export function DesignModulePage(): React.JSX.Element {
     );
   };
 
+  const handleSubmitDesign = (product: string, sizes: string[]): void => {
+    const count = designs.length + 1;
+    const reviewNo = `DES-${2200 + count}`;
+    const assignee = user ? `${user.firstName} ${user.lastName[0]}.` : 'Designer';
+    setDesigns((prev) => [
+      {
+        reviewNo,
+        product,
+        assignee,
+        sizes,
+        date: new Date().toISOString().slice(0, 10),
+        status: 'PENDING APPROVAL',
+      },
+      ...prev,
+    ]);
+    setShowSubmitModal(false);
+    setActiveTab('pending');
+  };
+
   const tabs: { key: Tab; label: string }[] = [
     { key: 'pending', label: 'Pending Approval' },
     { key: 'approved', label: 'Approved Designs' },
@@ -93,9 +202,20 @@ export function DesignModulePage(): React.JSX.Element {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Design Module</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Stage 1 — Fashion design review and approval workflow</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Design Module</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Stage 1 — Fashion design review and approval workflow</p>
+        </div>
+        <button
+          onClick={() => setShowSubmitModal(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          Submit Design
+        </button>
       </div>
 
       {/* Tabs */}
@@ -163,7 +283,7 @@ export function DesignModulePage(): React.JSX.Element {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
-                        {row.status === 'PENDING APPROVAL' && (
+                        {row.status === 'PENDING APPROVAL' && isAdmin && (
                           <>
                             <button
                               onClick={() => handleApprove(row.reviewNo)}
@@ -179,6 +299,9 @@ export function DesignModulePage(): React.JSX.Element {
                             </button>
                           </>
                         )}
+                        {row.status === 'PENDING APPROVAL' && !isAdmin && (
+                          <span className="text-xs text-amber-600 font-medium">Awaiting review</span>
+                        )}
                         {(row.status === 'APPROVED' || row.status === 'REJECTED') && (
                           <button className="px-3 py-1 rounded text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
                             View
@@ -193,6 +316,13 @@ export function DesignModulePage(): React.JSX.Element {
           </table>
         </div>
       </div>
+
+      {showSubmitModal && (
+        <SubmitDesignModal
+          onClose={() => setShowSubmitModal(false)}
+          onSubmit={handleSubmitDesign}
+        />
+      )}
     </div>
   );
 }

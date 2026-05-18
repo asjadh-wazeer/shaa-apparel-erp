@@ -1,12 +1,30 @@
 import React from 'react';
 import { useAppSelector } from '../../../../store';
+import { useGetProfileQuery } from '../../../../features/auth/api/auth.api';
+
+function formatLastLogin(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1)  return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
 
 export function Header(): React.JSX.Element {
   const user = useAppSelector((s) => s.auth.user);
+  const isAuthenticated = useAppSelector((s) => s.auth.isAuthenticated);
+
+  const { data: profileData } = useGetProfileQuery(undefined, { skip: !isAuthenticated });
+  const profile = profileData?.data;
 
   return (
     <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0">
-      {/* Left: empty or page breadcrumb placeholder */}
+      {/* Left: empty / breadcrumb placeholder */}
       <div />
 
       {/* Right: actions + user info */}
@@ -25,7 +43,7 @@ export function Header(): React.JSX.Element {
           </svg>
         </button>
 
-        {/* Question mark */}
+        {/* Help */}
         <button
           className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
           aria-label="Help"
@@ -45,9 +63,15 @@ export function Header(): React.JSX.Element {
         {/* User info */}
         <div className="text-right">
           <p className="text-sm font-semibold text-gray-900 leading-tight">
-            {user?.roles?.[0] ?? 'CEO & Founder'}
+            {user?.roles?.[0] ?? 'Admin'}
           </p>
-          <p className="text-xs text-gray-500 leading-tight">SHAA Apparel ERP</p>
+          {profile?.lastLoginAt ? (
+            <p className="text-xs text-gray-400 leading-tight">
+              Last login: {formatLastLogin(profile.lastLoginAt)}
+            </p>
+          ) : (
+            <p className="text-xs text-gray-500 leading-tight">SHAA Apparel ERP</p>
+          )}
         </div>
       </div>
     </header>

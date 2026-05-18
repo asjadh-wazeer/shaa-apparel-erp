@@ -90,6 +90,8 @@ export const apiSlice = createApi({
     'Dashboard',
     'SaleRecord',
     'PosConfig',
+    'SystemUser',
+    'SystemRole',
   ],
   endpoints: () => ({}),
 });
