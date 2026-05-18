@@ -21,9 +21,9 @@ export const qcApi = apiSlice.injectEndpoints({
     getQualityChecks: builder.query<PaginatedResponse<QualityCheck>, QcQueryParams>({
       query: (params = {}) => ({ url: '/quality-control', params }),
       providesTags: (result) =>
-        result
+        Array.isArray(result?.data)
           ? [
-              ...result.data.map(({ id }) => ({ type: 'QualityCheck' as const, id })),
+              ...result!.data.map(({ id }) => ({ type: 'QualityCheck' as const, id })),
               { type: 'QualityCheck', id: 'LIST' },
             ]
           : [{ type: 'QualityCheck', id: 'LIST' }],

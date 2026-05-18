@@ -37,9 +37,9 @@ export const designApi = apiSlice.injectEndpoints({
     getDesignSubmissions: builder.query<PaginatedResponse<DesignSubmission>, QueryDesignSubmissionsParams>({
       query: (params = {}) => ({ url: '/design-submissions', params }),
       providesTags: (result) =>
-        result
+        Array.isArray(result?.data)
           ? [
-              ...result.data.map(({ id }) => ({ type: 'DesignSubmission' as const, id })),
+              ...result!.data.map(({ id }) => ({ type: 'DesignSubmission' as const, id })),
               { type: 'DesignSubmission', id: 'LIST' },
             ]
           : [{ type: 'DesignSubmission', id: 'LIST' }],

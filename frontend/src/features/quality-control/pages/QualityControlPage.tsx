@@ -373,7 +373,7 @@ function CheckDetailPanel({ check, onClose }: CheckDetailPanelProps): React.JSX.
           </div>
 
           {/* Defects */}
-          {check.defects.length > 0 && (
+          {(check.defects?.length ?? 0) > 0 && (
             <div>
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Defects ({check.defects.length})</h3>
               <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -387,7 +387,7 @@ function CheckDetailPanel({ check, onClose }: CheckDetailPanelProps): React.JSX.
                     </tr>
                   </thead>
                   <tbody>
-                    {check.defects.map((d) => (
+                    {(check.defects ?? []).map((d) => (
                       <tr key={d.id} className="border-b border-gray-100">
                         <td className="px-3 py-2 font-mono text-gray-600">{d.defectCode}</td>
                         <td className="px-3 py-2 text-gray-700">{d.defectName}</td>
@@ -406,11 +406,11 @@ function CheckDetailPanel({ check, onClose }: CheckDetailPanelProps): React.JSX.
           )}
 
           {/* Reworks */}
-          {check.reworks.length > 0 && (
+          {(check.reworks?.length ?? 0) > 0 && (
             <div>
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Rework Records ({check.reworks.length})</h3>
               <div className="space-y-2">
-                {check.reworks.map((rw) => (
+                {(check.reworks ?? []).map((rw) => (
                   <div key={rw.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
                     <div>
                       <p className="text-sm font-medium text-gray-800">{rw.reworkType}</p>
@@ -476,7 +476,7 @@ export function QualityControlPage(): React.JSX.Element {
 
   const defectTotals = checks.reduce(
     (acc, c) => {
-      c.defects.forEach((d) => {
+      (c.defects ?? []).forEach((d) => {
         acc[d.severity] = (acc[d.severity] ?? 0) + d.quantity;
       });
       return acc;
