@@ -306,6 +306,111 @@ async function seedEmployees(): Promise<void> {
   }
 }
 
+async function seedRoles(): Promise<void> {
+  const tenants = await prisma.tenant.findMany({ where: { deletedAt: null } });
+  const allPermissions = await prisma.permission.findMany();
+
+  const roleDefs: { name: string; description: string; modules: string[]; actions: string[] }[] = [
+    { name: 'CEO_FOUNDER',           description: 'CEO & Founder — Full access',                  modules: ['*'], actions: ['*'] },
+    { name: 'GENERAL_MANAGER',       description: 'General Manager — Operations oversight',        modules: ['production','production_workflow','costing','quality_control','finished_goods','inventory','warehouses','suppliers','purchase_orders','reporting','dashboards'], actions: ['create','read','update','delete','approve','reject','export'] },
+    { name: 'HR_EXECUTIVE',          description: 'HR Executive — People management',             modules: ['users','roles','audit_logs','notifications'], actions: ['create','read','update'] },
+    { name: 'HEAD_OFFICE_ACCOUNTANT',description: 'Head Office Accountant',                      modules: ['purchase_orders','suppliers','costing','reporting','inventory','warehouses'], actions: ['create','read','update','approve','export'] },
+    { name: 'SHOWROOM_ACCOUNTANT',   description: 'Showroom Accountant — POS & Sales',            modules: ['pos_integration','reporting','file_management'], actions: ['create','read','update','export'] },
+    { name: 'FINANCE_PAYROLL',       description: 'Finance & Payroll',                            modules: ['reporting','costing'], actions: ['read','export','view_sensitive'] },
+    { name: 'FASHION_DESIGNER',      description: 'Fashion Designer',                             modules: ['production','production_workflow','file_management'], actions: ['create','read','update'] },
+    { name: 'HEAD_PATTERN_MAKER',    description: 'Head Pattern Maker',                           modules: ['production_workflow','production'], actions: ['create','read','update','approve'] },
+    { name: 'DIGITAL_PATTERN_MAKER', description: 'Digital Pattern Maker',                        modules: ['production_workflow','production'], actions: ['create','read','update'] },
+    { name: 'SAMPLE_MAKER',          description: 'Sample Maker',                                 modules: ['production_workflow','production'], actions: ['create','read','update'] },
+    { name: 'GRAPHIC_DESIGNER',      description: 'Graphic Designer — Finished goods & photos',   modules: ['finished_goods','file_management'], actions: ['create','read','update'] },
+    { name: 'STOREKEEPER',           description: 'Storekeeper — Inventory management',           modules: ['inventory','warehouses','suppliers','purchase_orders'], actions: ['create','read','update'] },
+    { name: 'CUTTING_SUPERVISOR',    description: 'Cutting Supervisor',                           modules: ['production_workflow','production','warehouses','inventory'], actions: ['create','read','update'] },
+    { name: 'CUTTING_VERIFIER',      description: 'Cutting Verifier',                             modules: ['production_workflow','production'], actions: ['read','update'] },
+    { name: 'SEWING_SUPERVISOR',     description: 'Sewing Supervisor',                            modules: ['production_workflow','production'], actions: ['create','read','update'] },
+    { name: 'QC_INSPECTOR',          description: 'QC Inspector — Quality checks',                modules: ['quality_control','finished_goods','production'], actions: ['create','read','update','reject'] },
+    { name: 'QA_APPROVER',           description: 'QA Approver',                                  modules: ['quality_control','production','production_workflow','finished_goods'], actions: ['create','read','update','approve','reject'] },
+    { name: 'PRODUCTION_MANAGER',    description: 'Production Manager',                           modules: ['production','production_workflow','quality_control','finished_goods','reporting','costing'], actions: ['create','read','update','delete','approve','reject','export'] },
+    { name: 'SALES_STAFF',           description: 'Sales Staff — POS & showroom',                 modules: ['pos_integration','file_management'], actions: ['create','read','update'] },
+  ];
+
+  for (const tenant of tenants) {
+    for (const def of roleDefs) {
+      const exists = await prisma.role.findFirst({ where: { tenantId: tenant.id, name: def.name } });
+      if (exists) continue;
+
+      const perms = def.modules.includes('*')
+        ? allPermissions
+        : allPermissions.filter(
+            (p) => def.modules.includes(p.module) && (def.actions.includes('*') || def.actions.includes(p.action)),
+          );
+
+      await prisma.role.create({
+        data: {
+          tenantId: tenant.id,
+          name: def.name,
+          description: def.description,
+          isSystem: true,
+          rolePermissions: { create: perms.map((p) => ({ permissionId: p.id })) },
+        },
+      });
+    }
+    console.log(`✅ Roles seeded for tenant "${tenant.name}" (19 roles)`);
+  }
+}
+
+async function seedDemoUsers(): Promise<void> {
+  const tenants = await prisma.tenant.findMany({ where: { deletedAt: null } });
+  const passwordHash = await bcrypt.hash('Staff@1234', 12);
+
+  const demoUsers = [
+    { email: 'ceo@shaaapparel.com',        username: 'ceo',         firstName: 'CEO',        lastName: 'Founder',      roleName: 'CEO_FOUNDER' },
+    { email: 'gm@shaaapparel.com',         username: 'gm',          firstName: 'General',    lastName: 'Manager',      roleName: 'GENERAL_MANAGER' },
+    { email: 'hr@shaaapparel.com',         username: 'hr',          firstName: 'HR',         lastName: 'Executive',    roleName: 'HR_EXECUTIVE' },
+    { email: 'accountant@shaaapparel.com', username: 'accountant',  firstName: 'Head',       lastName: 'Accountant',   roleName: 'HEAD_OFFICE_ACCOUNTANT' },
+    { email: 'showroom@shaaapparel.com',   username: 'showroom',    firstName: 'Showroom',   lastName: 'Accountant',   roleName: 'SHOWROOM_ACCOUNTANT' },
+    { email: 'finance@shaaapparel.com',    username: 'finance',     firstName: 'Finance',    lastName: 'Payroll',      roleName: 'FINANCE_PAYROLL' },
+    { email: 'designer@shaaapparel.com',   username: 'designer',    firstName: 'Fashion',    lastName: 'Designer',     roleName: 'FASHION_DESIGNER' },
+    { email: 'headpattern@shaaapparel.com',username: 'headpattern', firstName: 'Head',       lastName: 'PatternMaker', roleName: 'HEAD_PATTERN_MAKER' },
+    { email: 'pattern@shaaapparel.com',    username: 'pattern',     firstName: 'Digital',    lastName: 'PatternMaker', roleName: 'DIGITAL_PATTERN_MAKER' },
+    { email: 'sample@shaaapparel.com',     username: 'sample',      firstName: 'Sample',     lastName: 'Maker',        roleName: 'SAMPLE_MAKER' },
+    { email: 'graphic@shaaapparel.com',    username: 'graphic',     firstName: 'Graphic',    lastName: 'Designer',     roleName: 'GRAPHIC_DESIGNER' },
+    { email: 'store@shaaapparel.com',      username: 'store',       firstName: 'Store',      lastName: 'Keeper',       roleName: 'STOREKEEPER' },
+    { email: 'cutting@shaaapparel.com',    username: 'cutting',     firstName: 'Cutting',    lastName: 'Supervisor',   roleName: 'CUTTING_SUPERVISOR' },
+    { email: 'cutter@shaaapparel.com',     username: 'cutter',      firstName: 'Cutting',    lastName: 'Verifier',     roleName: 'CUTTING_VERIFIER' },
+    { email: 'sewing@shaaapparel.com',     username: 'sewing',      firstName: 'Sewing',     lastName: 'Supervisor',   roleName: 'SEWING_SUPERVISOR' },
+    { email: 'qc@shaaapparel.com',         username: 'qcinspector', firstName: 'QC',         lastName: 'Inspector',    roleName: 'QC_INSPECTOR' },
+    { email: 'qa@shaaapparel.com',         username: 'qa',          firstName: 'QA',         lastName: 'Approver',     roleName: 'QA_APPROVER' },
+    { email: 'production@shaaapparel.com', username: 'production',  firstName: 'Production', lastName: 'Manager',      roleName: 'PRODUCTION_MANAGER' },
+    { email: 'sales@shaaapparel.com',      username: 'sales',       firstName: 'Sales',      lastName: 'Staff',        roleName: 'SALES_STAFF' },
+  ];
+
+  for (const tenant of tenants) {
+    let created = 0;
+    for (const demo of demoUsers) {
+      const existing = await prisma.user.findUnique({ where: { email: demo.email } });
+      if (existing) continue;
+
+      const role = await prisma.role.findFirst({ where: { tenantId: tenant.id, name: demo.roleName } });
+      if (!role) continue;
+
+      await prisma.user.create({
+        data: {
+          tenantId: tenant.id,
+          email: demo.email,
+          username: demo.username,
+          passwordHash,
+          firstName: demo.firstName,
+          lastName: demo.lastName,
+          status: 'ACTIVE',
+          emailVerifiedAt: new Date(),
+          userRoles: { create: { roleId: role.id } },
+        },
+      });
+      created++;
+    }
+    console.log(`✅ Demo users seeded for tenant "${tenant.name}": ${created} users (password: Staff@1234)`);
+  }
+}
+
 async function main(): Promise<void> {
   console.log('🌱 Starting database seed...');
   await seedPermissions();
@@ -314,6 +419,8 @@ async function main(): Promise<void> {
   await seedProductionStages();
   await seedProductionData();
   await seedEmployees();
+  await seedRoles();
+  await seedDemoUsers();
   console.log('🎉 Seed completed successfully!');
 }
 

@@ -18,22 +18,57 @@ interface NavSection {
 }
 
 // Roles that have full admin access
-const ADMIN_ROLES = ['TENANT_ADMIN', 'ADMIN', 'SUPER_ADMIN'];
+const ADMIN_ROLES = ['TENANT_ADMIN', 'ADMIN', 'SUPER_ADMIN', 'CEO_FOUNDER'];
 
-// Role aliases used in the seed / backend
+// Role → sidebar module keys (from RBAC specification)
 const ROLE_ACCESS: Record<string, string[]> = {
-  TENANT_ADMIN:       ['*'],
-  ADMIN:              ['*'],
-  SUPER_ADMIN:        ['*'],
-  FASHION_DESIGNER:   ['design_module', 'product_tracker'],
-  PATTERN_MAKER:      ['pattern_making', 'product_tracker', 'design_module'],
-  CUTTING_SUPERVISOR: ['cutting_dept', 'product_tracker', 'warehouse'],
-  SEWING_SUPERVISOR:  ['sewing_dept', 'product_tracker'],
-  QC_INSPECTOR:       ['quality_control', 'finished_goods', 'product_tracker'],
-  PRODUCTION_MANAGER: ['product_tracker', 'design_module', 'pattern_making', 'sample_making', 'cutting_dept', 'sewing_dept', 'quality_control', 'finished_goods', 'kpi_incentives', 'reports'],
-  STOREKEEPER:        ['warehouse', 'inventory', 'purchasing', 'suppliers', 'recipe_management'],
-  HR_EXECUTIVE:       ['attendance', 'kpi_incentives', 'user_roles', 'reports'],
-  GENERAL_MANAGER:    ['*'],
+  // Full access
+  TENANT_ADMIN:             ['*'],
+  ADMIN:                    ['*'],
+  SUPER_ADMIN:              ['*'],
+  CEO_FOUNDER:              ['*'],
+
+  // Management
+  GENERAL_MANAGER: [
+    'product_tracker', 'design_module', 'pattern_making', 'sample_making',
+    'cutting_dept', 'sewing_dept', 'quality_control', 'finished_goods',
+    'warehouse', 'purchasing', 'suppliers', 'costing', 'reports', 'kpi_incentives',
+  ],
+
+  // HR & Finance
+  HR_EXECUTIVE:             ['attendance', 'kpi_incentives', 'user_roles', 'reports'],
+  HEAD_OFFICE_ACCOUNTANT:   ['purchasing', 'suppliers', 'costing', 'reports', 'warehouse'],
+  SHOWROOM_ACCOUNTANT:      ['pos_sales', 'photo_distribution', 'reports'],
+  FINANCE_PAYROLL:          ['kpi_incentives', 'reports'],
+
+  // Design & Pattern
+  FASHION_DESIGNER:         ['design_module', 'product_tracker'],
+  HEAD_PATTERN_MAKER:       ['pattern_making', 'product_tracker'],
+  DIGITAL_PATTERN_MAKER:    ['pattern_making', 'product_tracker'],
+  PATTERN_MAKER:            ['pattern_making', 'product_tracker'],
+
+  // Production
+  SAMPLE_MAKER:             ['sample_making', 'product_tracker'],
+  CUTTING_SUPERVISOR:       ['cutting_dept', 'product_tracker', 'warehouse'],
+  CUTTING_VERIFIER:         ['cutting_dept'],
+  SEWING_SUPERVISOR:        ['sewing_dept', 'product_tracker'],
+  PRODUCTION_MANAGER: [
+    'product_tracker', 'design_module', 'pattern_making', 'sample_making',
+    'cutting_dept', 'sewing_dept', 'quality_control', 'finished_goods',
+    'kpi_incentives', 'reports',
+  ],
+
+  // Quality
+  QC_INSPECTOR:             ['quality_control', 'finished_goods', 'product_tracker'],
+  QA_APPROVER: [
+    'design_module', 'pattern_making', 'sample_making',
+    'quality_control', 'product_tracker',
+  ],
+
+  // Inventory & Sales
+  STOREKEEPER:              ['warehouse', 'recipe_management', 'purchasing', 'suppliers'],
+  GRAPHIC_DESIGNER:         ['finished_goods', 'photo_distribution'],
+  SALES_STAFF:              ['pos_sales', 'photo_distribution'],
 };
 
 const navSections: NavSection[] = [
