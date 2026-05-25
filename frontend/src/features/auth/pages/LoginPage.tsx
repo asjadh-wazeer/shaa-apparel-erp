@@ -12,14 +12,24 @@ import { ROUTES } from '../../../shared/constants';
 const ROLE_OPTIONS = [
   'CEO & Founder',
   'General Manager',
+  'Tenant Admin',
   'HR Executive',
+  'Head Office Accountant',
+  'Showroom Accountant',
+  'Finance & Payroll',
   'Fashion Designer',
-  'Pattern Maker',
+  'Head Pattern Maker',
+  'Digital Pattern Maker',
+  'Sample Maker',
+  'Graphic Designer',
+  'Storekeeper',
   'Cutting Supervisor',
+  'Cutting Verifier',
   'Sewing Supervisor',
   'QC Inspector',
+  'QA Approver',
   'Production Manager',
-  'Storekeeper',
+  'Sales Staff',
 ];
 
 export function LoginPage(): React.JSX.Element {
