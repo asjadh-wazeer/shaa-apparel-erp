@@ -23,6 +23,7 @@
     "prisma:migrate:prod": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "prisma:seed": "ts-node prisma/seed.ts",
+    "seed": "ts-node --transpile-only prisma/seed.ts",
     "prisma:reset": "prisma migrate reset --force"
   },
   "dependencies": {
@@ -95,6 +96,9 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.3.3"
+  },
+  "prisma": {
+    "seed": "ts-node --transpile-only prisma/seed.ts"
   },
   "jest": {
     "moduleFileExtensions": [

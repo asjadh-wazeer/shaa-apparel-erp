@@ -176,13 +176,11 @@ async function seedProductionData(): Promise<void> {
   const tenants = await prisma.tenant.findMany({ where: { deletedAt: null } });
 
   for (const tenant of tenants) {
-    // Always rebuild production data so each stage has demo batches
-    await prisma.qualityCheck.deleteMany({ where: { tenantId: tenant.id } });
-    await prisma.productionStageHistory.deleteMany({
-      where: { batch: { productionOrder: { tenantId: tenant.id } } },
-    });
-    await prisma.productionBatch.deleteMany({ where: { productionOrder: { tenantId: tenant.id } } });
-    await prisma.productionOrder.deleteMany({ where: { tenantId: tenant.id } });
+    const existing = await prisma.productionOrder.count({ where: { tenantId: tenant.id } });
+    if (existing > 0) {
+      console.log('ℹ️  Production data already exists — skipping');
+      continue;
+    }
 
     type StageConfig = { id: string; code: string; orderIndex: number };
     const stages = await prisma.productionStageConfig.findMany({
@@ -386,7 +384,7 @@ async function seedDemoUsers(): Promise<void> {
   for (const tenant of tenants) {
     let created = 0;
     for (const demo of demoUsers) {
-      const existing = await prisma.user.findUnique({ where: { email: demo.email } });
+      const existing = await prisma.user.findFirst({ where: { email: demo.email } });
       if (existing) continue;
 
       const role = await prisma.role.findFirst({ where: { tenantId: tenant.id, name: demo.roleName } });

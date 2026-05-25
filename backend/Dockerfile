@@ -27,6 +27,8 @@ FROM base AS production
 ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm install --omit=dev
+# ts-node needed to run prisma seed on startup
+RUN npm install ts-node typescript tsconfig-paths --no-save
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
@@ -39,4 +41,4 @@ RUN addgroup --system --gid 1001 nodejs && \
 
 USER nestjs
 EXPOSE 3001
-CMD ["node", "dist/src/main"]
+CMD ["sh", "-c", "npx prisma db seed && node dist/src/main"]
