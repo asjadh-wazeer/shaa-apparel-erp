@@ -116,7 +116,7 @@ services:
         condition: service_healthy
     networks:
       - erp-network
-    command: sh -c "npx prisma migrate deploy && npm run prisma:seed && npm run start:dev"
+    command: sh -c "npx prisma db push --accept-data-loss && npm run prisma:seed && npm run start:dev"
 
   # ----------------------------------------------------------
   # React Frontend
