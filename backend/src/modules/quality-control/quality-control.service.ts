@@ -25,6 +25,7 @@ export class QualityControlService {
       limit,
     });
     return {
+      success: true,
       data,
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };

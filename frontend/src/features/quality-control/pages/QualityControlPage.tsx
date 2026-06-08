@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import toast from 'react-hot-toast';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -264,9 +265,15 @@ function CheckDetailPanel({ check, onClose }: CheckDetailPanelProps): React.JSX.
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    await uploadPhoto({ id: check.id, file }).unwrap();
-    refetchPhotos();
-    e.target.value = '';
+    try {
+      await uploadPhoto({ id: check.id, file }).unwrap();
+      refetchPhotos();
+      toast.success('Photo uploaded');
+    } catch (err: any) {
+      toast.error(err?.data?.message ?? 'Upload failed');
+    } finally {
+      e.target.value = '';
+    }
   };
 
   const passRate = check.inspectedQty > 0
@@ -274,7 +281,12 @@ function CheckDetailPanel({ check, onClose }: CheckDetailPanelProps): React.JSX.
     : '0';
 
   const handleApprove = async () => {
-    await approve(check.id).unwrap();
+    try {
+      await approve(check.id).unwrap();
+      toast.success('Inspection approved');
+    } catch (err: any) {
+      toast.error(err?.data?.message ?? 'Approval failed');
+    }
   };
 
   const handleReworkStatus = async (rework: ReworkRecord, status: ReworkStatus) => {
@@ -725,7 +737,10 @@ export function QualityControlPage(): React.JSX.Element {
       {/* Modals */}
       <QcCheckModal isOpen={modalOpen} onClose={() => setModalOpen(false)} />
       {selectedCheck && (
-        <CheckDetailPanel check={selectedCheck} onClose={() => setSelectedCheck(null)} />
+        <CheckDetailPanel
+          check={checks.find((c) => c.id === selectedCheck.id) ?? selectedCheck}
+          onClose={() => setSelectedCheck(null)}
+        />
       )}
     </div>
   );

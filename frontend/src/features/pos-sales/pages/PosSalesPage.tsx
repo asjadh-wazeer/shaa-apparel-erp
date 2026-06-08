@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import toast from 'react-hot-toast';
 import { Button } from '../../../shared/components/ui/Button/Button';
 import { Modal } from '../../../shared/components/modal/Modal';
 import {
@@ -13,8 +14,11 @@ import {
   useCreateSaleMutation,
   useUpdateSaleMutation,
   useDeleteSaleMutation,
+  useTriggerSyncMutation,
+  useGetSyncStatusQuery,
+  useGetSyncLogsQuery,
 } from '../api/pos.api';
-import type { SaleRecord, SaleChannel, SaleStatus, CartItem, CatalogItem } from '../types/pos.types';
+import type { SaleRecord, SaleChannel, SaleStatus, CartItem, CatalogItem, SyncStatus } from '../types/pos.types';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -519,9 +523,199 @@ function PosConfigTab(): React.JSX.Element {
   );
 }
 
+// ── Website Sync Tab ──────────────────────────────────────────────────────────
+
+const SYNC_STATUS_STYLE: Record<SyncStatus, string> = {
+  PENDING: 'bg-yellow-100 text-yellow-700',
+  SUCCESS: 'bg-green-100 text-green-700',
+  FAILED:  'bg-red-100 text-red-700',
+  RETRY:   'bg-orange-100 text-orange-700',
+};
+
+const BASE_API = (import.meta as any).env?.VITE_API_BASE_URL ?? '/api/v1';
+
+function WebsiteSyncTab(): React.JSX.Element {
+  const { data: statusData, isLoading: statusLoading, refetch: refetchStatus } = useGetSyncStatusQuery();
+  const { data: logsData, isLoading: logsLoading, refetch: refetchLogs } = useGetSyncLogsQuery();
+  const [triggerSync, { isLoading: triggering }] = useTriggerSyncMutation();
+
+  const status = statusData?.data;
+  const logs = logsData?.data ?? [];
+
+  const handleTrigger = async () => {
+    try {
+      await triggerSync().unwrap();
+      toast.success('Sync job queued — inventory will push to the website shortly');
+      setTimeout(() => { refetchStatus(); refetchLogs(); }, 3000);
+    } catch (err: any) {
+      toast.error(err?.data?.message ?? 'Failed to trigger sync');
+    }
+  };
+
+  const pullUrl = `${window.location.origin}${BASE_API}/pos-integration/public/catalog/${status?.config?.tenantId ?? '<tenantId>'}`;
+
+  return (
+    <div className="space-y-5">
+      {/* Status card */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Sync status */}
+        <div className="bg-white rounded-xl shadow-sm p-5 space-y-3 lg:col-span-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold text-gray-900">Website Inventory Sync</h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Pushes finished-goods stock levels to your external website in real time.
+              </p>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={triggering}
+              disabled={!status?.config?.apiEndpoint}
+              onClick={handleTrigger}
+            >
+              Sync Now
+            </Button>
+          </div>
+
+          {!status?.config?.apiEndpoint && (
+            <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+              No API endpoint configured. Go to the <strong>Configuration</strong> tab and enter your website's webhook URL.
+            </div>
+          )}
+
+          {statusLoading ? (
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <div className="animate-spin w-4 h-4 rounded-full border-2 border-indigo-400 border-t-transparent" />
+              Loading…
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                {
+                  label: 'Integration',
+                  value: status?.config?.isActive ? 'Active' : 'Inactive',
+                  color: status?.config?.isActive ? 'text-green-600' : 'text-gray-400',
+                },
+                {
+                  label: 'Last Sync',
+                  value: status?.config?.lastSyncAt
+                    ? new Date(status.config.lastSyncAt).toLocaleString()
+                    : 'Never',
+                  color: 'text-gray-700',
+                },
+                {
+                  label: 'Last Result',
+                  value: status?.lastLog?.status ?? '—',
+                  color: status?.lastLog?.status === 'SUCCESS' ? 'text-green-600'
+                       : status?.lastLog?.status === 'FAILED'  ? 'text-red-600'
+                       : 'text-gray-500',
+                },
+                {
+                  label: 'Items Synced',
+                  value: status?.lastLog ? `${status.lastLog.itemsSynced} / ${status.lastLog.itemsSynced + status.lastLog.itemsFailed}` : '—',
+                  color: 'text-gray-700',
+                },
+              ].map((s) => (
+                <div key={s.label} className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 uppercase font-medium mb-1">{s.label}</p>
+                  <p className={`text-sm font-bold ${s.color}`}>{s.value}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Last error */}
+          {status?.lastLog?.status === 'FAILED' && status.lastLog.errorLog && (
+            <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 font-mono">
+              {JSON.stringify(status.lastLog.errorLog, null, 2)}
+            </div>
+          )}
+        </div>
+
+        {/* Pull URL card */}
+        <div className="bg-white rounded-xl shadow-sm p-5 space-y-3">
+          <div>
+            <h3 className="font-semibold text-gray-900 text-sm">Website Pull URL</h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Your website can call this URL to fetch the latest inventory without credentials.
+            </p>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-3 break-all text-xs font-mono text-indigo-700 select-all">
+            {status?.config ? pullUrl : 'Configure POS first to see the URL'}
+          </div>
+          {status?.config && (
+            <button
+              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+              onClick={() => { navigator.clipboard.writeText(pullUrl); toast.success('URL copied'); }}
+            >
+              Copy URL
+            </button>
+          )}
+          <div className="text-xs text-gray-400 space-y-1">
+            <p>Response format:</p>
+            <pre className="bg-gray-50 rounded p-2 text-gray-600 overflow-x-auto">{`[{ sku, name, stock, price, category, color, size }]`}</pre>
+          </div>
+        </div>
+      </div>
+
+      {/* Sync logs */}
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900">Sync History</h3>
+        </div>
+        {logsLoading ? (
+          <div className="flex items-center justify-center py-10">
+            <div className="animate-spin w-6 h-6 rounded-full border-4 border-indigo-500 border-t-transparent" />
+          </div>
+        ) : logs.length === 0 ? (
+          <p className="text-center text-sm text-gray-400 py-10">No sync history yet. Click "Sync Now" to run the first sync.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  {['Started', 'Completed', 'Type', 'Status', 'Synced', 'Failed', 'Error'].map((h) => (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map((log) => (
+                  <tr key={log.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
+                      {new Date(log.startedAt).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
+                      {log.completedAt ? new Date(log.completedAt).toLocaleString() : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-600">{log.syncType}</td>
+                    <td className="px-4 py-3">
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${SYNC_STATUS_STYLE[log.status]}`}>
+                        {log.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-green-700 font-semibold">{log.itemsSynced}</td>
+                    <td className="px-4 py-3 text-xs text-red-600 font-semibold">{log.itemsFailed}</td>
+                    <td className="px-4 py-3 text-xs text-red-500 max-w-[200px] truncate">
+                      {log.errorLog && log.errorLog.length > 0
+                        ? (log.errorLog[0] as any)?.message ?? 'Error'
+                        : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-type Tab = 'sales' | 'terminal' | 'config';
+type Tab = 'sales' | 'terminal' | 'config' | 'sync';
 
 export function PosSalesPage(): React.JSX.Element {
   const [tab, setTab] = useState<Tab>('sales');
@@ -570,9 +764,10 @@ export function PosSalesPage(): React.JSX.Element {
       {/* Tabs */}
       <div className="border-b border-gray-200 flex gap-6">
         {([
-          { key: 'sales' as Tab, label: 'Sales Records' },
+          { key: 'sales' as Tab,    label: 'Sales Records' },
           { key: 'terminal' as Tab, label: 'POS Terminal' },
-          { key: 'config' as Tab, label: 'Configuration' },
+          { key: 'sync' as Tab,     label: '🌐 Website Sync' },
+          { key: 'config' as Tab,   label: 'Configuration' },
         ]).map((t) => (
           <button
             key={t.key}
@@ -588,9 +783,10 @@ export function PosSalesPage(): React.JSX.Element {
         ))}
       </div>
 
-      {tab === 'sales' && <SalesTab />}
+      {tab === 'sales'    && <SalesTab />}
       {tab === 'terminal' && <PosTerminalTab />}
-      {tab === 'config' && <PosConfigTab />}
+      {tab === 'sync'     && <WebsiteSyncTab />}
+      {tab === 'config'   && <PosConfigTab />}
     </div>
   );
 }

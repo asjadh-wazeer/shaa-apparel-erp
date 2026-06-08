@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { FinishedGoodsRepository } from './finished-goods.repository';
+import { PosIntegrationService } from '../pos-integration/pos-integration.service';
 import { CreateFinishedGoodDto } from './dto/create-finished-good.dto';
 import { UpdateFinishedGoodDto } from './dto/update-finished-good.dto';
 import { QueryFinishedGoodsDto } from './dto/query-finished-goods.dto';
@@ -7,7 +8,10 @@ import { AdjustStockDto, StockAdjustmentType } from './dto/adjust-stock.dto';
 
 @Injectable()
 export class FinishedGoodsService {
-  constructor(private readonly repo: FinishedGoodsRepository) {}
+  constructor(
+    private readonly repo: FinishedGoodsRepository,
+    private readonly posService: PosIntegrationService,
+  ) {}
 
   async getStats(tenantId: string) {
     return this.repo.getStats(tenantId);
@@ -38,17 +42,23 @@ export class FinishedGoodsService {
   }
 
   async create(tenantId: string, dto: CreateFinishedGoodDto) {
-    return this.repo.create(tenantId, dto);
+    const good = await this.repo.create(tenantId, dto);
+    await this.posService.enqueueSyncIfActive(tenantId);
+    return good;
   }
 
   async update(tenantId: string, id: string, dto: UpdateFinishedGoodDto) {
     await this.findById(tenantId, id);
-    return this.repo.update(tenantId, id, dto);
+    const good = await this.repo.update(tenantId, id, dto);
+    await this.posService.enqueueSyncIfActive(tenantId);
+    return good;
   }
 
   async delete(tenantId: string, id: string) {
     await this.findById(tenantId, id);
-    return this.repo.delete(tenantId, id);
+    const result = await this.repo.delete(tenantId, id);
+    await this.posService.enqueueSyncIfActive(tenantId);
+    return result;
   }
 
   async adjustStock(tenantId: string, id: string, dto: AdjustStockDto) {
@@ -58,6 +68,8 @@ export class FinishedGoodsService {
         `Insufficient stock. Available: ${good.quantity}, requested: ${dto.quantity}`,
       );
     }
-    return this.repo.adjustStock(tenantId, id, dto.type, dto.quantity);
+    const updated = await this.repo.adjustStock(tenantId, id, dto.type, dto.quantity);
+    await this.posService.enqueueSyncIfActive(tenantId);
+    return updated;
   }
 }

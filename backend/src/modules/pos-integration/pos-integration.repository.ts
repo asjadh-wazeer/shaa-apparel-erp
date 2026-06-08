@@ -213,4 +213,21 @@ export class PosIntegrationRepository {
       },
     });
   }
+
+  // ── Sync Logs ──────────────────────────────────────────────────────────────
+
+  async getSyncLogs(tenantId: string, limit = 20) {
+    return this.prisma.posSyncLog.findMany({
+      where: { tenantId },
+      orderBy: { startedAt: 'desc' },
+      take: limit,
+    });
+  }
+
+  async getLastSyncLog(tenantId: string) {
+    return this.prisma.posSyncLog.findFirst({
+      where: { tenantId },
+      orderBy: { startedAt: 'desc' },
+    });
+  }
 }

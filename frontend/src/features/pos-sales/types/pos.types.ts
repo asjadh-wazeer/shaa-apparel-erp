@@ -96,3 +96,26 @@ export interface CartItem {
   quantity: number;
   unitPrice: number;
 }
+
+// ── Website Sync ──────────────────────────────────────────────────────────────
+
+export type SyncStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'RETRY';
+
+export interface PosSyncLog {
+  id: string;
+  tenantId: string;
+  posConfigId: string;
+  syncType: string;
+  status: SyncStatus;
+  itemsSynced: number;
+  itemsFailed: number;
+  errorLog?: any[];
+  startedAt: string;
+  completedAt?: string;
+  retryCount: number;
+}
+
+export interface SyncStatusResponse {
+  config: PosConfig | null;
+  lastLog: PosSyncLog | null;
+}

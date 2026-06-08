@@ -10,26 +10,26 @@ import { useAppDispatch, useAppSelector } from '../../../store';
 import { ROUTES } from '../../../shared/constants';
 
 const ROLE_OPTIONS = [
-  'CEO & Founder',
-  'General Manager',
-  'Tenant Admin',
-  'HR Executive',
-  'Head Office Accountant',
-  'Showroom Accountant',
-  'Finance & Payroll',
-  'Fashion Designer',
-  'Head Pattern Maker',
-  'Digital Pattern Maker',
-  'Sample Maker',
-  'Graphic Designer',
-  'Storekeeper',
-  'Cutting Supervisor',
-  'Cutting Verifier',
-  'Sewing Supervisor',
-  'QC Inspector',
-  'QA Approver',
-  'Production Manager',
-  'Sales Staff',
+  { label: 'Tenant Admin',            email: 'admin@shaaapparel.com',       password: 'Admin@1234' },
+  { label: 'CEO & Founder',           email: 'ceo@shaaapparel.com',         password: 'Staff@1234' },
+  { label: 'General Manager',         email: 'gm@shaaapparel.com',          password: 'Staff@1234' },
+  { label: 'HR Executive',            email: 'hr@shaaapparel.com',          password: 'Staff@1234' },
+  { label: 'Head Office Accountant',  email: 'accountant@shaaapparel.com',  password: 'Staff@1234' },
+  { label: 'Showroom Accountant',     email: 'showroom@shaaapparel.com',    password: 'Staff@1234' },
+  { label: 'Finance & Payroll',       email: 'finance@shaaapparel.com',     password: 'Staff@1234' },
+  { label: 'Fashion Designer',        email: 'designer@shaaapparel.com',    password: 'Staff@1234' },
+  { label: 'Head Pattern Maker',      email: 'headpattern@shaaapparel.com', password: 'Staff@1234' },
+  { label: 'Digital Pattern Maker',   email: 'pattern@shaaapparel.com',     password: 'Staff@1234' },
+  { label: 'Sample Maker',            email: 'sample@shaaapparel.com',      password: 'Staff@1234' },
+  { label: 'Graphic Designer',        email: 'graphic@shaaapparel.com',     password: 'Staff@1234' },
+  { label: 'Storekeeper',             email: 'store@shaaapparel.com',       password: 'Staff@1234' },
+  { label: 'Cutting Supervisor',      email: 'cutting@shaaapparel.com',     password: 'Staff@1234' },
+  { label: 'Cutting Verifier',        email: 'cutter@shaaapparel.com',      password: 'Staff@1234' },
+  { label: 'Sewing Supervisor',       email: 'sewing@shaaapparel.com',      password: 'Staff@1234' },
+  { label: 'QC Inspector',            email: 'qc@shaaapparel.com',          password: 'Staff@1234' },
+  { label: 'QA Approver',             email: 'qa@shaaapparel.com',          password: 'Staff@1234' },
+  { label: 'Production Manager',      email: 'production@shaaapparel.com',  password: 'Staff@1234' },
+  { label: 'Sales Staff',             email: 'sales@shaaapparel.com',       password: 'Staff@1234' },
 ];
 
 export function LoginPage(): React.JSX.Element {
@@ -45,11 +45,20 @@ export function LoginPage(): React.JSX.Element {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
   });
+
+  const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const role = ROLE_OPTIONS.find((r) => r.label === e.target.value);
+    if (role) {
+      setValue('email', role.email, { shouldValidate: true });
+      setValue('password', role.password, { shouldValidate: true });
+    }
+  };
 
   if (isAuthenticated) return <Navigate to={ROUTES.DASHBOARD} replace />;
 
@@ -225,9 +234,11 @@ export function LoginPage(): React.JSX.Element {
               </label>
               <select
                 className="w-full px-3 py-2.5 rounded-lg border border-gray-300 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                onChange={handleRoleChange}
               >
+                <option value="">— select a role —</option>
                 {ROLE_OPTIONS.map((role) => (
-                  <option key={role} value={role}>{role}</option>
+                  <option key={role.label} value={role.label}>{role.label}</option>
                 ))}
               </select>
             </div>

@@ -9,6 +9,8 @@ import {
   UpdateSalePayload,
   UpsertPosConfigPayload,
   SalesQueryParams,
+  PosSyncLog,
+  SyncStatusResponse,
 } from '../types/pos.types';
 
 export const posApi = apiSlice.injectEndpoints({
@@ -72,6 +74,23 @@ export const posApi = apiSlice.injectEndpoints({
         { type: 'FinishedGood', id: 'CATALOG' },
       ],
     }),
+
+    // ── Website Sync ────────────────────────────────────────────────────────
+
+    triggerSync: builder.mutation<ApiResponse<{ jobId: string | number }>, void>({
+      query: () => ({ url: '/pos-integration/sync/trigger', method: 'POST' }),
+      invalidatesTags: [{ type: 'PosConfig', id: 'SYNC_STATUS' }],
+    }),
+
+    getSyncStatus: builder.query<ApiResponse<SyncStatusResponse>, void>({
+      query: () => '/pos-integration/sync/status',
+      providesTags: [{ type: 'PosConfig', id: 'SYNC_STATUS' }],
+    }),
+
+    getSyncLogs: builder.query<ApiResponse<PosSyncLog[]>, void>({
+      query: () => '/pos-integration/sync/logs',
+      providesTags: [{ type: 'PosConfig', id: 'SYNC_LOGS' }],
+    }),
   }),
 });
 
@@ -84,4 +103,7 @@ export const {
   useCreateSaleMutation,
   useUpdateSaleMutation,
   useDeleteSaleMutation,
+  useTriggerSyncMutation,
+  useGetSyncStatusQuery,
+  useGetSyncLogsQuery,
 } = posApi;

@@ -600,7 +600,6 @@ model PurchaseOrder {
   supplier Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   items    PurchaseOrderItem[]
   grns     GoodsReceivedNote[]
-  files    FileUpload[]
 
   @@unique([tenantId, poNumber])
   @@index([tenantId])
@@ -645,7 +644,6 @@ model GoodsReceivedNote {
 
   purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
   items         GrnItem[]
-  files         FileUpload[]
 
   @@unique([tenantId, grnNumber])
   @@index([tenantId])
@@ -726,7 +724,6 @@ model ProductionOrder {
   assignments       ProductionAssignment[]
   qualityChecks     QualityCheck[]
   costingCalc       CostingCalculation?
-  files             FileUpload[]
   designSubmissions DesignSubmission[]
   patternRecords    PatternRecord[]
   cuttingOrders     CuttingOrder[]
@@ -1067,7 +1064,6 @@ model QualityCheck {
   productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Restrict)
   defects         DefectRecord[]
   reworks         ReworkRecord[]
-  files           FileUpload[]
 
   @@index([tenantId])
   @@index([productionOrderId])
@@ -1397,11 +1393,6 @@ model FileUpload {
   deletedAt      DateTime?
 
   createdAt DateTime @default(now())
-
-  purchaseOrder     PurchaseOrder?     @relation(fields: [entityId], references: [id], map: "fk_file_purchase_order")
-  grn               GoodsReceivedNote? @relation(fields: [entityId], references: [id], map: "fk_file_grn")
-  productionOrder   ProductionOrder?   @relation(fields: [entityId], references: [id], map: "fk_file_production_order")
-  qualityCheck      QualityCheck?      @relation(fields: [entityId], references: [id], map: "fk_file_quality_check")
 
   @@index([tenantId])
   @@index([entityType, entityId])
